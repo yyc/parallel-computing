@@ -296,6 +296,21 @@ void* gaussian_blur(void *blur_info_ptr)
   return NULL;
 }
 
+long long wall_clock_time()
+{
+#ifdef __linux__
+  struct timespec tp;
+  clock_gettime(CLOCK_REALTIME, &tp);
+  return (long long)(tp.tv_nsec + (long long)tp.tv_sec * 1000000000ll);
+
+#else /* ifdef __linux__ */
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (long long)(tv.tv_usec * 1000 + (long long)tv.tv_sec * 1000000000ll);
+
+#endif /* ifdef __linux__ */
+}
+
 int main(int argc, char **argv)
 {
   unsigned char info[54], *dataR = NULL, *dataG = NULL, *dataB = NULL;
@@ -303,6 +318,7 @@ int main(int argc, char **argv)
   char  *in_filename, *out_filename;
   float *dstB, *dstR, *dstG, sigma;
 
+  long long time_difference, start_time;
 
   if (argc != 5)
   {
@@ -314,16 +330,21 @@ int main(int argc, char **argv)
   out_filename = argv[4];
   blur_size    = atoi(argv[3]);
   sigma        = atof(argv[2]);
-  ret_code     = read_BMP(in_filename,
-                          info,
-                          &dataR,
-                          &dataG,
-                          &dataB,
-                          &size,
-                          &width,
-                          &height,
-                          &offset,
-                          &row_padded);
+
+  start_time = wall_clock_time();
+  ret_code   = read_BMP(in_filename,
+                        info,
+                        &dataR,
+                        &dataG,
+                        &dataB,
+                        &size,
+                        &width,
+                        &height,
+                        &offset,
+                        &row_padded);
+  printf("Read_BMP took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
+
 
   if (ret_code < 0)
   {
@@ -333,10 +354,14 @@ int main(int argc, char **argv)
     return -1;
   }
 
+  start_time = wall_clock_time();
+
   dstB = (float *)malloc(width * height * sizeof(float));
   dstR = (float *)malloc(width * height * sizeof(float));
   dstG = (float *)malloc(width * height * sizeof(float));
 
+  printf("malloc took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
 
   pthread_t threadB, threadR, threadG;
 
@@ -362,6 +387,8 @@ int main(int argc, char **argv)
   green_info.sigma  = sigma;
   green_info.ksize  = blur_size;
 
+  start_time = wall_clock_time();
+
   pthread_create(&threadB, NULL, gaussian_blur, &blue_info);
   pthread_create(&threadR, NULL, gaussian_blur, &red_info);
   gaussian_blur(&green_info);
@@ -371,6 +398,11 @@ int main(int argc, char **argv)
   // gaussian_blur (&green_info);
   pthread_join(threadB, NULL);
   pthread_join(threadR, NULL);
+
+  printf("Parallel gaussian took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
+
+  start_time = wall_clock_time();
 
   ret_code = write_BMP(out_filename,
                        dstB,
@@ -382,6 +414,10 @@ int main(int argc, char **argv)
                        row_padded,
                        height);
 
+  printf("write_BMP took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
+
+  start_time = wall_clock_time();
 
   free(dstB);
   free(dstR);
@@ -389,6 +425,10 @@ int main(int argc, char **argv)
   free(dataB);
   free(dataR);
   free(dataG);
+
+  printf("write_BMP took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
+
 
   return ret_code;
 }

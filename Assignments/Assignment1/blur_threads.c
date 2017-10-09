@@ -3,15 +3,24 @@
 #include <math.h>
 #include <pthread.h>
 
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
 struct blur_info {
   unsigned char *src;
   float         *dst, sigma;
   int            width, height, ksize;
 };
+struct write_info {
+  unsigned char *write_buf;
+  float         *dataB, *dataG, *dataR;
+  int            start, length;
+};
+
+int NUM_THREADS = 4;
 
 int read_BMP(char           *filename,
              unsigned char  *info,
+             unsigned char **data,
              unsigned char **dataR,
              unsigned char **dataG,
              unsigned char **dataB,
@@ -22,7 +31,6 @@ int read_BMP(char           *filename,
              int            *row_padded)
 {
   int i = 0, j, k, read_bytes, h, w, o, p;
-  unsigned char *data;
 
   FILE *f = fopen(filename, "rb");
 
@@ -35,6 +43,7 @@ int read_BMP(char           *filename,
 
   read_bytes = fread(info, sizeof(unsigned char), 54, f); // read the 54-byte
                                                           // header
+
 
   if (read_bytes != 54)
   {
@@ -58,13 +67,14 @@ int read_BMP(char           *filename,
   h = *height;
   o = *offset;
 
-  data   = (unsigned char *)malloc(p * h);
+  *data  = (unsigned char *)malloc(p * h);
   *dataR = (unsigned char *)malloc(w * h);
   *dataG = (unsigned char *)malloc(w * h);
   *dataB = (unsigned char *)malloc(w * h);
 
   fseek(f, sizeof(unsigned char) * o, SEEK_SET);
-  read_bytes = fread(data, sizeof(unsigned char), p * h, f);
+  read_bytes = fread(*data, sizeof(unsigned char), p * h, f);
+
 
   if (read_bytes != p * h)
   {
@@ -79,9 +89,9 @@ int read_BMP(char           *filename,
 
     for (j = 0; j < w; j++)
     {
-      (*dataB)[k * w + j] = data[i];
-      (*dataG)[k * w + j] = data[i + 1];
-      (*dataR)[k * w + j] = data[i + 2];
+      (*dataB)[k * w + j] = (*data)[i];
+      (*dataG)[k * w + j] = (*data)[i + 1];
+      (*dataR)[k * w + j] = (*data)[i + 2];
 
       // printf ("BGR %d %d i= %d: %d %d %d\n", k, j, i, data[i], data[i+1],
       // data[i+2]);
@@ -89,15 +99,20 @@ int read_BMP(char           *filename,
     }
   }
 
-  free(data);
   fclose(f);
   return 0;
 }
 
+void* assemble_segment(void *write_info_ptr) {
+  struct write_info *info = (struct write_info *)write_info_ptr;
+
+  for (int i = info->start; i < info->start + info->length; i++) { // Rows
+  }
+  return NULL;
+}
+
 int write_BMP(char          *filename,
-              float         *dataB,
-              float         *dataG,
-              float         *dataR,
+              unsigned char *write_buf,
               unsigned char *header,
               int            offset,
               int            width,
@@ -106,7 +121,6 @@ int write_BMP(char          *filename,
 {
   int   write_bytes = 0, i, pad_size;
   FILE *f = fopen(filename, "wb");
-  unsigned char null_byte = 0, valR, valB, valG;
 
   write_bytes = fwrite(header, sizeof(unsigned char), offset, f);
 
@@ -117,45 +131,12 @@ int write_BMP(char          *filename,
   }
 
 
-  for (i = 0; i < width * height; i++)
+  write_bytes = fwrite(write_buf, sizeof(unsigned char), height * row_padded, f);
+
+  if (write_bytes != height * row_padded)
   {
-    if ((dataB[i] > 256.0f) || (dataR[i] > 256.0f) || (dataG[i] > 256.0f)) {
-      printf("Error: invalid value %f %f %f", dataB[i], dataG[i], dataR[i]);
-      return -1;
-    }
-
-    valB        = dataB[i];
-    valG        = dataG[i];
-    valR        = dataR[i];
-    write_bytes = fwrite(&valB, sizeof(unsigned char), 1, f);
-
-    if (write_bytes != 1)
-    {
-      printf("Error at write: i = %d %d\n", i, valB);
-      return -1;
-    }
-    write_bytes = fwrite(&valG, sizeof(unsigned char), 1, f);
-
-    if (write_bytes != 1)
-    {
-      printf("Error at write: i = %d %d\n", i, valG);
-      return -1;
-    }
-    write_bytes = fwrite(&valR, sizeof(unsigned char), 1, f);
-
-    if (write_bytes != 1)
-    {
-      printf("Error at write: i = %d %d\n", i, valR);
-      return -1;
-    }
-
-    if ((i + 1) % width == 0) {
-      pad_size = row_padded - width * 3;
-
-      while (pad_size-- > 0) {
-        fwrite(&null_byte, sizeof(unsigned char), 1, f);
-      }
-    }
+    printf("Error at write: i = %d %d\n", i, write_buf[i]);
+    return -1;
   }
 
   fclose(f);
@@ -232,24 +213,40 @@ void* gaussian_blur(void *blur_info_ptr)
   // blur each row
   for (y = 0; y < height; y++)
   {
+    // Set up the buffer, which is a sort of sliding window for the kernel
+    // everything to the left is the same as the first elem
+    // suppose image is 123456789abcdefghihjkl
     for (x1 = 0; x1 < halfksize; x1++)
     {
-      buffer[x1] = (float)src[y * width];
+      buffer[x1] = (float)src[y * width]; // buffer: 1111_____
     }
 
+    // Everything to the right as usual
     for (x1 = halfksize; x1 < ksize - 1; x1++)
     {
       buffer[x1] = (float)src[y * width + x1 - halfksize];
+
+      /* buffer:
+         11111____
+         111112
+         1111123
+         11111234_
+       */
     }
 
+    // For each element, shift the buffer one to the right and convolve
     for (x1 = 0; x1 < width; x1++)
     {
-      i = (x1 + ksize - 1) % ksize;
+      i = (x1 + ksize - 1) % ksize; // 8
 
       if (x1 < width - halfksize)
       {
         buffer[i] = (float)src[y * width + x1 + halfksize];
+
+        // buffer: 111112345
       }
+
+      // Handle the end of the row the same as above
       else
       {
         buffer[i] = (float)src[y * width + width - 1];
@@ -313,7 +310,8 @@ long long wall_clock_time()
 
 int main(int argc, char **argv)
 {
-  unsigned char info[54], *dataR = NULL, *dataG = NULL, *dataB = NULL;
+  unsigned char info[54], *dataR = NULL, *dataG = NULL, *dataB = NULL,
+                *data = NULL;
   int blur_size, ret_code = 0, size, width, height, offset, row_padded;
   char  *in_filename, *out_filename;
   float *dstB, *dstR, *dstG, sigma;
@@ -331,9 +329,11 @@ int main(int argc, char **argv)
   blur_size    = atoi(argv[3]);
   sigma        = atof(argv[2]);
 
+
   start_time = wall_clock_time();
   ret_code   = read_BMP(in_filename,
                         info,
+                        &data,
                         &dataR,
                         &dataG,
                         &dataB,
@@ -342,6 +342,7 @@ int main(int argc, char **argv)
                         &height,
                         &offset,
                         &row_padded);
+
   printf("Read_BMP took %1.2f seconds\n",
          ((float)(wall_clock_time() - start_time)) / 1000000000);
 
@@ -404,10 +405,26 @@ int main(int argc, char **argv)
 
   start_time = wall_clock_time();
 
+
+  int increment = 1 + height * width / NUM_THREADS;
+  pthread_t threads[NUM_THREADS];
+  int threadcount = 0;
+
+  for (int i = 0; i < height * width; i += increment) {
+    struct write_info info;
+    info.write_buf = data;
+    info.dataB     = dstB;
+    info.dataR     = dstR;
+    info.dataG     = dstG;
+    info.start     = i;
+    info.length    = MIN(increment, height * width - i);
+    pthread_t newthread;
+    threads[threadcount++] = newthread;
+    pthread_create(threads, NULL, assemble_segment, &info);
+  }
+
   ret_code = write_BMP(out_filename,
-                       dstB,
-                       dstG,
-                       dstR,
+                       data,
                        info,
                        offset,
                        width,
@@ -426,7 +443,7 @@ int main(int argc, char **argv)
   free(dataR);
   free(dataG);
 
-  printf("write_BMP took %1.2f seconds\n",
+  printf("free took %1.2f seconds\n",
          ((float)(wall_clock_time() - start_time)) / 1000000000);
 
 

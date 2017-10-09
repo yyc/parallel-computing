@@ -4,6 +4,12 @@
 #include <pthread.h>
 
 
+struct blur_info {
+  unsigned char *src;
+  float *dst, sigma;
+  int width, height, ksize;
+};
+
 int read_BMP(char* filename, unsigned char *info, unsigned char **dataR, unsigned char **dataG, unsigned char **dataB, int *size, int *width, int *height, int *offset, int *row_padded)
 {
     int i = 0, j, k, read_bytes, h, w, o, p;
@@ -140,15 +146,23 @@ float convolve(const float *kernel, const float *buffer, const int ksize) {
 }
 
 
-void gaussian_blur(unsigned char *src, float *dst, int width, int height, float sigma, int ksize)
+void *gaussian_blur(void *blur_info_ptr)
 {
     int x, y, i, x1, y1;
+
+
+    struct blur_info *info_ptr = (struct blur_info *)blur_info_ptr;
+    // Deconstruct the original arguments
+    unsigned char *src = info_ptr->src;
+    float *dst = info_ptr->dst;
+    int width = info_ptr->width;
+    int height = info_ptr->height;
+    float sigma = info_ptr->sigma;
+    int ksize = info_ptr->ksize;
 
     int halfksize = ksize / 2;
     float sum = 0.f, t;
     float *kernel, *buffer;
-
-
 
     // create Gaussian kernel
     kernel = (float*)malloc(ksize * sizeof(float));
@@ -157,7 +171,7 @@ void gaussian_blur(unsigned char *src, float *dst, int width, int height, float 
     if (!kernel || !buffer)
     {
         printf ("Error in memory allocation!\n");
-        return;
+        return NULL;
     }
 
     // if sigma too small, just copy src to dst
@@ -166,7 +180,7 @@ void gaussian_blur(unsigned char *src, float *dst, int width, int height, float 
         for (y = 0; y < height; y++)
             for (x = 0; x < width; x++)
                 dst[y*width + x] = src[y*width + x];
-        return;
+        return NULL;
     }
 
 
@@ -247,9 +261,8 @@ void gaussian_blur(unsigned char *src, float *dst, int width, int height, float 
     // clean up
     free(kernel);
     free(buffer);
+    return NULL;
 }
-
-
 
 
 int main(int argc, char ** argv)
@@ -278,14 +291,38 @@ int main(int argc, char ** argv)
         return -1;
     }
 
-
     dstB = (float*)malloc (width*height* sizeof(float));
     dstR = (float*)malloc (width*height* sizeof(float));
     dstG = (float*)malloc (width*height* sizeof(float));
 
-    gaussian_blur (dataB, dstB, width, height, sigma, blur_size);
-    gaussian_blur (dataR, dstR, width, height, sigma, blur_size);
-    gaussian_blur (dataG, dstG, width, height, sigma, blur_size);
+
+    pthread_t threadB, threadR, threadG;
+
+    struct blur_info blue_info;
+    blue_info.src = dataB;
+    blue_info.dst = dstB;
+    blue_info.width = width;
+    blue_info.height = height;
+    blue_info.sigma = sigma;
+    blue_info.ksize = blur_size;
+    struct blur_info red_info;
+    red_info.src = dataR;
+    red_info.dst = dstR;
+    red_info.width = width;
+    red_info.height = height;
+    red_info.sigma = sigma;
+    red_info.ksize = blur_size;
+    struct blur_info green_info;
+    green_info.src = dataG;
+    green_info.dst = dstG;
+    green_info.width = width;
+    green_info.height = height;
+    green_info.sigma = sigma;
+    green_info.ksize = blur_size;
+
+    gaussian_blur (&blue_info);
+    gaussian_blur (&red_info);
+    gaussian_blur (&green_info);
 
     ret_code = write_BMP (out_filename, dstB, dstG, dstR, info, offset, width, row_padded, height);
 

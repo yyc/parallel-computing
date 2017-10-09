@@ -13,7 +13,7 @@ struct blur_info {
 struct write_info {
   unsigned char *write_buf;
   float         *dataB, *dataG, *dataR;
-  int            start, length;
+  int            row, numrows, height, width, row_padded;
 };
 
 int NUM_THREADS = 4;
@@ -105,8 +105,18 @@ int read_BMP(char           *filename,
 
 void* assemble_segment(void *write_info_ptr) {
   struct write_info *info = (struct write_info *)write_info_ptr;
+  unsigned char     *write_buf = info->write_buf;
+  float *dataB = info->dataB, *dataG = info->dataG, *dataR = info->dataR;
 
-  for (int i = info->start; i < info->start + info->length; i++) { // Rows
+  for (int i = info->row; i < info->row + info->numrows; i++) { // Rows
+    int write_offset = i * info->row_padded;
+    int read_offset  = i * info->width;
+
+    for (int j = 0; j < info->width; j++) {
+      write_buf[write_offset + 3 * j]     = (unsigned char)dataB[read_offset + j];
+      write_buf[write_offset + 3 * j + 1] = (unsigned char)dataG[read_offset + j];
+      write_buf[write_offset + 3 * j + 2] = (unsigned char)dataR[read_offset + j];
+    }
   }
   return NULL;
 }
@@ -394,9 +404,6 @@ int main(int argc, char **argv)
   pthread_create(&threadR, NULL, gaussian_blur, &red_info);
   gaussian_blur(&green_info);
 
-  // gaussian_blur (&blue_info);
-  // gaussian_blur (&red_info);
-  // gaussian_blur (&green_info);
   pthread_join(threadB, NULL);
   pthread_join(threadR, NULL);
 
@@ -406,30 +413,43 @@ int main(int argc, char **argv)
   start_time = wall_clock_time();
 
 
-  int increment = 1 + height * width / NUM_THREADS;
+  int increment = 1 + height / NUM_THREADS;
   pthread_t threads[NUM_THREADS];
   int threadcount = 0;
 
-  for (int i = 0; i < height * width; i += increment) {
+  for (int i = 0; i < height; i += increment) {
     struct write_info info;
-    info.write_buf = data;
-    info.dataB     = dstB;
-    info.dataR     = dstR;
-    info.dataG     = dstG;
-    info.start     = i;
-    info.length    = MIN(increment, height * width - i);
+    info.write_buf  = data;
+    info.dataB      = dstB;
+    info.dataR      = dstR;
+    info.dataG      = dstG;
+    info.row        = i;
+    info.numrows    = MIN(increment, height - i);
+    info.row_padded = row_padded;
+    info.height     = height;
+    info.width      = width;
     pthread_t newthread;
     threads[threadcount++] = newthread;
-    pthread_create(threads, NULL, assemble_segment, &info);
+    printf("Starting new thread for row %d + %d of %d\n", i, info.numrows,
+           height);
+    pthread_create(&newthread, NULL, assemble_segment, &info);
   }
 
-  ret_code = write_BMP(out_filename,
-                       data,
-                       info,
-                       offset,
-                       width,
-                       row_padded,
-                       height);
+  for (int i = 0; i < NUM_THREADS; i++) {
+    pthread_join(threads[i], NULL);
+    printf("Finished Thread\n");
+  }
+  printf("Assembly took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
+
+  start_time = wall_clock_time();
+  ret_code   = write_BMP(out_filename,
+                         data,
+                         info,
+                         offset,
+                         width,
+                         row_padded,
+                         height);
 
   printf("write_BMP took %1.2f seconds\n",
          ((float)(wall_clock_time() - start_time)) / 1000000000);

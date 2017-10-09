@@ -107,8 +107,10 @@ void* assemble_segment(void *write_info_ptr) {
   struct write_info *info = (struct write_info *)write_info_ptr;
   unsigned char     *write_buf = info->write_buf;
   float *dataB = info->dataB, *dataG = info->dataG, *dataR = info->dataR;
+  int    heightlimit = MIN(info->height, info->row + info->numrows);
 
-  for (int i = info->row; i < info->row + info->numrows; i++) { // Rows
+  for (int i = info->row; i < heightlimit; i++) { //
+    // Rows
     int write_offset = i * info->row_padded;
     int read_offset  = i * info->width;
 
@@ -353,8 +355,8 @@ int main(int argc, char **argv)
                         &offset,
                         &row_padded);
 
-  printf("Read_BMP took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("Read_BMP took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
 
   if (ret_code < 0)
@@ -371,8 +373,8 @@ int main(int argc, char **argv)
   dstR = (float *)malloc(width * height * sizeof(float));
   dstG = (float *)malloc(width * height * sizeof(float));
 
-  printf("malloc took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("malloc took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
   pthread_t threadB, threadR, threadG;
 
@@ -407,8 +409,8 @@ int main(int argc, char **argv)
   pthread_join(threadB, NULL);
   pthread_join(threadR, NULL);
 
-  printf("Parallel gaussian took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("Parallel gaussian took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
   start_time = wall_clock_time();
 
@@ -418,29 +420,35 @@ int main(int argc, char **argv)
   int threadcount = 0;
 
   for (int i = 0; i < height; i += increment) {
-    struct write_info info;
-    info.write_buf  = data;
-    info.dataB      = dstB;
-    info.dataR      = dstR;
-    info.dataG      = dstG;
-    info.row        = i;
-    info.numrows    = MIN(increment, height - i);
-    info.row_padded = row_padded;
-    info.height     = height;
-    info.width      = width;
-    pthread_t newthread;
-    threads[threadcount++] = newthread;
-    printf("Starting new thread for row %d + %d of %d\n", i, info.numrows,
-           height);
-    pthread_create(&newthread, NULL, assemble_segment, &info);
+    struct write_info *info = (struct write_info *)malloc(
+      sizeof(struct write_info));
+
+    info->write_buf  = data;
+    info->dataB      = dstB;
+    info->dataR      = dstR;
+    info->dataG      = dstG;
+    info->row        = i;
+    info->numrows    = increment;
+    info->row_padded = row_padded;
+    info->height     = height;
+    info->width      = width;
+
+    // printf("Starting new thread for row %d + %d of %d, with info %d\n",
+    //        i,
+    //        info->numrows,
+    //        height,
+    //        info);
+    pthread_create(&threads[threadcount++], NULL, assemble_segment, info);
   }
 
   for (int i = 0; i < NUM_THREADS; i++) {
-    pthread_join(threads[i], NULL);
-    printf("Finished Thread\n");
+    int result = pthread_join(threads[i], NULL);
+
+    // printf("Finished Thread with status %d\n", result);
   }
-  printf("Assembly took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+
+  // printf("Assembly took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
   start_time = wall_clock_time();
   ret_code   = write_BMP(out_filename,
@@ -451,8 +459,8 @@ int main(int argc, char **argv)
                          row_padded,
                          height);
 
-  printf("write_BMP took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("write_BMP took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
   start_time = wall_clock_time();
 
@@ -463,8 +471,8 @@ int main(int argc, char **argv)
   free(dataR);
   free(dataG);
 
-  printf("free took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("free took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
 
   return ret_code;

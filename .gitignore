@@ -1,5 +1,7 @@
-*/.DS_Store
+**/.DS_Store
 Lecture Notes/*
 Readings/*
 Tutorials/*
-*/*.pdf
+**/*.pdf
+**/bin/*
+**/out/**

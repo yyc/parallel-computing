@@ -320,9 +320,15 @@ int main(int argc, char ** argv)
     green_info.sigma = sigma;
     green_info.ksize = blur_size;
 
-    gaussian_blur (&blue_info);
-    gaussian_blur (&red_info);
-    gaussian_blur (&green_info);
+    pthread_create(&threadB, NULL, gaussian_blur, &blue_info);
+    pthread_create(&threadR, NULL, gaussian_blur, &red_info);
+    pthread_create(&threadG, NULL, gaussian_blur, &green_info);
+    // gaussian_blur (&blue_info);
+    // gaussian_blur (&red_info);
+    // gaussian_blur (&green_info);
+    pthread_join(threadB, NULL);
+    pthread_join(threadR, NULL);
+    pthread_join(threadG, NULL);
 
     ret_code = write_BMP (out_filename, dstB, dstG, dstR, info, offset, width, row_padded, height);
 

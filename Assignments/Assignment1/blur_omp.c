@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <pthread.h>
+#include <omp.h>
+
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
@@ -16,7 +17,7 @@ struct write_info {
   int            row, numrows, height, width, row_padded;
 };
 
-int NUM_THREADS = 4;
+int NUM_THREADS = omp_get_num_procs();
 
 int read_BMP(char           *filename,
              unsigned char  *info,
@@ -377,7 +378,6 @@ int main(int argc, char **argv)
   // printf("malloc took %1.2f seconds\n",
   //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
-  pthread_t threadB, threadR, threadG;
 
   struct blur_info blue_info;
   blue_info.src    = dataB;
@@ -403,12 +403,26 @@ int main(int argc, char **argv)
 
   start_time = wall_clock_time();
 
-  pthread_create(&threadB, NULL, gaussian_blur, &blue_info);
-  pthread_create(&threadR, NULL, gaussian_blur, &red_info);
-  gaussian_blur(&green_info);
+  int thread_id;
+  #pragma omp parallel private(thread_id) num_threads(3)
+  {
+    thread_id = omp_get_thread_num();
 
-  pthread_join(threadB, NULL);
-  pthread_join(threadR, NULL);
+    switch (thread_id) {
+    case 0:
+      gaussian_blur(&green_info);
+      break;
+
+    case 1:
+      gaussian_blur(&blue_info);
+      break;
+
+    case 2:
+      gaussian_blur(&red_info);
+      break;
+    }
+  }
+
 
   // printf("Parallel gaussian took %1.2f seconds\n",
   //        ((float)(wall_clock_time() - start_time)) / 1000000000);
@@ -416,8 +430,7 @@ int main(int argc, char **argv)
   start_time = wall_clock_time();
 
 
-  int increment = 1 + height / NUM_THREADS;
-  pthread_t threads[NUM_THREADS];
+  int increment   = 1 + height / NUM_THREADS;
   int threadcount = 0;
 
   for (int i = 0; i < height; i += increment) {
@@ -434,19 +447,9 @@ int main(int argc, char **argv)
     info->height     = height;
     info->width      = width;
 
-    // printf("Starting new thread for row %d + %d of %d, with info %d\n",
-    //        i,
-    //        info->numrows,
-    //        height,
-    //        info);
-    pthread_create(&threads[threadcount++], NULL, assemble_segment, info);
+    assemble_segment(info);
   }
 
-  for (int i = 0; i < NUM_THREADS; i++) {
-    int result = pthread_join(threads[i], NULL);
-
-    // printf("Finished Thread with status %d\n", result);
-  }
 
   // printf("Assembly took %1.2f seconds\n",
   //        ((float)(wall_clock_time() - start_time)) / 1000000000);

@@ -5,7 +5,9 @@ seq_build:
 thread_build:
 	gcc -O3 -o bin/blur_threads -lm blur_threads.c;
 omp_build:
-	gcc -O3 -o bin/blur_omp -lm blur_omp.c;
+	export OMPI_CC=gcc-7
+	gcc-7 -O3 -lm blur_omp.c -fopenmp -o bin/blur_omp
+	# mpicc -O3 -o bin/blur_omp -lm blur_omp.c;
 
 
 threads: thread_build
@@ -16,8 +18,8 @@ threads: thread_build
 
 omp: omp_build
 	for number in 1 2 3 4 5 ; do \
-		time bin/blur_omp in/image$$number.bmp 3 9 out/image$$number_omp.bmp; \
-		echo $(diff out/image$$number_ref.bmp out/image$$number_omp.bmp); \
+		time mpirun -hostfile hostfile -np 3 bin/blur_omp in/image$$number.bmp 3 9 out/image_omp$$number.bmp; \
+		echo $(diff out/image$$number_ref.bmp out/image_omp$$number.bmp); \
 	done
 
 

@@ -17,7 +17,6 @@ struct write_info {
   int            row, numrows, height, width, row_padded;
 };
 
-int NUM_THREADS = omp_get_num_procs();
 
 int read_BMP(char           *filename,
              unsigned char  *info,
@@ -94,8 +93,6 @@ int read_BMP(char           *filename,
       (*dataG)[k * w + j] = (*data)[i + 1];
       (*dataR)[k * w + j] = (*data)[i + 2];
 
-      // printf ("BGR %d %d i= %d: %d %d %d\n", k, j, i, data[i], data[i+1],
-      // data[i+2]);
       i += 3;
     }
   }
@@ -104,21 +101,30 @@ int read_BMP(char           *filename,
   return 0;
 }
 
-void* assemble_segment(void *write_info_ptr) {
+void* assemble_segment(void *write_info_ptr, int row, int numrows) {
   struct write_info *info = (struct write_info *)write_info_ptr;
   unsigned char     *write_buf = info->write_buf;
   float *dataB = info->dataB, *dataG = info->dataG, *dataR = info->dataR;
-  int    heightlimit = MIN(info->height, info->row + info->numrows);
+  int    heightlimit = MIN(info->height, row + numrows);
 
-  for (int i = info->row; i < heightlimit; i++) { //
+  for (int i = row; i < heightlimit; i++) { //
     // Rows
     int write_offset = i * info->row_padded;
     int read_offset  = i * info->width;
 
-    for (int j = 0; j < info->width; j++) {
-      write_buf[write_offset + 3 * j]     = (unsigned char)dataB[read_offset + j];
-      write_buf[write_offset + 3 * j + 1] = (unsigned char)dataG[read_offset + j];
-      write_buf[write_offset + 3 * j + 2] = (unsigned char)dataR[read_offset + j];
+    for (int j = 0; j < info->row_padded / 3; j++) {
+      if (j < info->width) {
+        write_buf[write_offset + 3 *
+                  j] = (unsigned char)dataB[read_offset + j];
+        write_buf[write_offset + 3 * j +
+                  1] = (unsigned char)dataG[read_offset + j];
+        write_buf[write_offset + 3 * j +
+                  2] = (unsigned char)dataR[read_offset + j];
+      } else {
+        write_buf[write_offset + 3 * j]     = (unsigned char)0;
+        write_buf[write_offset + 3 * j + 1] = (unsigned char)0;
+        write_buf[write_offset + 3 * j + 2] = (unsigned char)0;
+      }
     }
   }
   return NULL;
@@ -224,6 +230,8 @@ void* gaussian_blur(void *blur_info_ptr)
 
 
   // blur each row
+  // #pragma omp parallel for schedule(static) private(x1, i, buffer)
+
   for (y = 0; y < height; y++)
   {
     // Set up the buffer, which is a sort of sliding window for the kernel
@@ -271,6 +279,8 @@ void* gaussian_blur(void *blur_info_ptr)
   }
 
   // blur each column
+  // #pragma omp parallel for schedule(static) private(y1, i, buffer)
+
   for (x = 0; x < width; x++)
   {
     for (y1 = 0; y1 < halfksize; y1++)
@@ -357,8 +367,8 @@ int main(int argc, char **argv)
                         &offset,
                         &row_padded);
 
-  // printf("Read_BMP took %1.2f seconds\n",
-  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
+  printf("Read_BMP took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
 
 
   if (ret_code < 0)
@@ -375,8 +385,8 @@ int main(int argc, char **argv)
   dstR = (float *)malloc(width * height * sizeof(float));
   dstG = (float *)malloc(width * height * sizeof(float));
 
-  // printf("malloc took %1.2f seconds\n",
-  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
+  printf("malloc took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
 
 
   struct blur_info blue_info;
@@ -401,9 +411,12 @@ int main(int argc, char **argv)
   green_info.sigma  = sigma;
   green_info.ksize  = blur_size;
 
-  start_time = wall_clock_time();
+
+  omp_set_num_threads(3);
+  omp_set_nested(1);
 
   int thread_id;
+  start_time = wall_clock_time();
   #pragma omp parallel private(thread_id) num_threads(3)
   {
     thread_id = omp_get_thread_num();
@@ -424,16 +437,18 @@ int main(int argc, char **argv)
   }
 
 
-  // printf("Parallel gaussian took %1.2f seconds\n",
-  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
+  printf("Parallel gaussian took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
 
+
+  int increment = 1 + height / omp_get_num_procs();
+  omp_set_dynamic(0);
+  omp_set_nested(0);
   start_time = wall_clock_time();
 
+  #pragma omp parallel for private(thread_id)
 
-  int increment   = 1 + height / NUM_THREADS;
-  int threadcount = 0;
-
-  for (int i = 0; i < height; i += increment) {
+  for (int i = 0; i < omp_get_num_procs(); i++) {
     struct write_info *info = (struct write_info *)malloc(
       sizeof(struct write_info));
 
@@ -441,18 +456,15 @@ int main(int argc, char **argv)
     info->dataB      = dstB;
     info->dataR      = dstR;
     info->dataG      = dstG;
-    info->row        = i;
-    info->numrows    = increment;
     info->row_padded = row_padded;
     info->height     = height;
     info->width      = width;
 
-    assemble_segment(info);
+    assemble_segment(info, i * increment, increment);
   }
 
-
-  // printf("Assembly took %1.2f seconds\n",
-  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
+  printf("Assembly took %1.2f seconds\n",
+         ((float)(wall_clock_time() - start_time)) / 1000000000);
 
   start_time = wall_clock_time();
   ret_code   = write_BMP(out_filename,

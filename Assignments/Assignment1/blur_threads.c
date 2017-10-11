@@ -114,10 +114,19 @@ void* assemble_segment(void *write_info_ptr) {
     int write_offset = i * info->row_padded;
     int read_offset  = i * info->width;
 
-    for (int j = 0; j < info->width; j++) {
-      write_buf[write_offset + 3 * j]     = (unsigned char)dataB[read_offset + j];
-      write_buf[write_offset + 3 * j + 1] = (unsigned char)dataG[read_offset + j];
-      write_buf[write_offset + 3 * j + 2] = (unsigned char)dataR[read_offset + j];
+    for (int j = 0; j < info->row_padded / 3; j++) {
+      if (j < info->width) {
+        write_buf[write_offset + 3 *
+                  j] = (unsigned char)dataB[read_offset + j];
+        write_buf[write_offset + 3 * j +
+                  1] = (unsigned char)dataG[read_offset + j];
+        write_buf[write_offset + 3 * j +
+                  2] = (unsigned char)dataR[read_offset + j];
+      } else {
+        write_buf[write_offset + 3 * j]     = (unsigned char)0;
+        write_buf[write_offset + 3 * j + 1] = (unsigned char)0;
+        write_buf[write_offset + 3 * j + 2] = (unsigned char)0;
+      }
     }
   }
   return NULL;

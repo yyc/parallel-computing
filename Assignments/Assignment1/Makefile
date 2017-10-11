@@ -17,6 +17,7 @@ threads: thread_build
 	done
 
 omp: omp_build
+	touch hostfile
 	for number in 1 2 3 4 5 ; do \
 		time mpirun -hostfile hostfile -np 1 bin/blur_omp in/image$$number.bmp 3 9 out/image_omp$$number.bmp; \
 		echo $$(diff out/image_ref$$number.bmp out/image_omp$$number.bmp); \

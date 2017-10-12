@@ -415,7 +415,7 @@ int main(int argc, char **argv)
   green_info.ksize  = blur_size;
 
 
-  omp_set_num_threads(3);
+  omp_set_num_threads(64);
   omp_set_nested(1);
 
   int thread_id;

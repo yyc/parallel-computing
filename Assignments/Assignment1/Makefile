@@ -14,12 +14,12 @@ omp_build:
 
 threads: thread_build
 	for number in 1 2 3 4 5 ; do \
-		time bin/blur_threads in/image$$number.bmp 3 9 out/image_threads$$number.bmp; \
+		 /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_threads in/image$$number.bmp 3 9 out/image_threads$$number.bmp; \
 		echo $$(diff out/image_ref$$number.bmp out/image_threads$$number.bmp); \
 	done
 thread_seq: thread_build_seq
 	for number in 1 2 3 4 5 ; do \
-		time bin/blur_thread_seq in/image$$number.bmp 3 9 out/image_threadsseq$$number.bmp; \
+		/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w"  bin/blur_thread_seq in/image$$number.bmp 3 9 out/image_threadsseq$$number.bmp; \
 		echo $$(diff out/image_ref$$number.bmp out/image_threadsseq$$number.bmp); \
 	done
 
@@ -27,12 +27,12 @@ thread_seq: thread_build_seq
 omp: omp_build
 	touch hostfile
 	for number in 1 2 3 4 5 ; do \
-		time mpirun -hostfile hostfile -np 1 bin/blur_omp in/image$$number.bmp 3 9 out/image_omp$$number.bmp; \
+		/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w"  mpirun -hostfile hostfile -np 1 bin/blur_omp in/image$$number.bmp 3 9 out/image_omp$$number.bmp; \
 		echo $$(diff out/image_ref$$number.bmp out/image_omp$$number.bmp); \
 	done
 
 
 seq: seq_build
 	for number in 1 2 3 4 5 ; do \
-		time bin/blur_seq in/image$$number.bmp 3 9 out/image_ref$$number.bmp; \
+		/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w"  bin/blur_seq in/image$$number.bmp 3 9 out/image_ref$$number.bmp; \
 	done

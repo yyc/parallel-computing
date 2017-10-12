@@ -176,22 +176,6 @@ float convolve(const float *kernel, const float *buffer, const int ksize) {
   return sum;
 }
 
-float new_convolve(const float *kernel,
-                   const float *buffer,
-                   const int    ksize,
-                   const int    halfksize,
-                   int          rowstart,
-                   int          rowwidth,
-                   int          bufferindex) {
-  float sum = 0.0f;
-
-  for (int i = 0; i < ksize; i++) {
-    if (rowindex - i < 0) {
-      sum += buffersize
-    }
-  }
-}
-
 void* gaussian_blur(void *blur_info_ptr)
 {
   int x, y, i, x1, y1;
@@ -465,9 +449,9 @@ int main(int argc, char **argv)
   omp_set_nested(0);
   start_time = wall_clock_time();
 
+  int i;
   #pragma omp parallel for private(thread_id)
 
-  int i;
 
   for (i = 0; i < omp_get_num_procs(); i++) {
     struct write_info *info = (struct write_info *)malloc(

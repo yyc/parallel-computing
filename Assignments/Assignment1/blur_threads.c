@@ -17,7 +17,7 @@ struct write_info {
   int            row, numrows, height, width, row_padded;
 };
 
-int NUM_THREADS = 4;
+int NUM_THREADS = 8;
 
 int read_BMP(char           *filename,
              unsigned char  *info,

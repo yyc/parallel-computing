@@ -43,7 +43,10 @@ seq: seq_build
 2a: thread_seq_build thread_build  omp_build
 	for cores in 0 1 3 5 7 ; do \
 		echo "====USING $$cores CORES ==="; \
+		echo "====SEQ===="; \
 		numactl --physcpubind=0-$$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_thread_seq in/image6.bmp 3 9 out/image_seq6.bmp; \
+		echo "====THREAD===="; \
 		numactl --physcpubind=0-$$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_threads in/image6.bmp 3 9 out/image_threads6.bmp; \
+		echo "====OMP===="; \
 		numactl --physcpubind=0-$$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" mpirun -hostfile hostfile -np 1 bin/blur_omp in/image6.bmp 3 9 out/image_omp6.bmp; \
 	done

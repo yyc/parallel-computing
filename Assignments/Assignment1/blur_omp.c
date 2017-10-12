@@ -370,8 +370,8 @@ int main(int argc, char **argv)
                         &offset,
                         &row_padded);
 
-  printf("Read_BMP took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("Read_BMP took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
 
   if (ret_code < 0)
@@ -388,8 +388,8 @@ int main(int argc, char **argv)
   dstR = (float *)malloc(width * height * sizeof(float));
   dstG = (float *)malloc(width * height * sizeof(float));
 
-  printf("malloc took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("malloc took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
 
   struct blur_info blue_info;
@@ -440,8 +440,8 @@ int main(int argc, char **argv)
   }
 
 
-  printf("Parallel gaussian took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("Parallel gaussian took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
 
   int increment = 1 + height / omp_get_num_procs();
@@ -468,8 +468,8 @@ int main(int argc, char **argv)
     assemble_segment(info, i * increment, increment);
   }
 
-  printf("Assembly took %1.2f seconds\n",
-         ((float)(wall_clock_time() - start_time)) / 1000000000);
+  // printf("Assembly took %1.2f seconds\n",
+  //        ((float)(wall_clock_time() - start_time)) / 1000000000);
 
   start_time = wall_clock_time();
   ret_code   = write_BMP(out_filename,

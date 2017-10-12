@@ -1,9 +1,11 @@
-buildall: seq_build thread_build
+buildall: seq_build thread_build omp_build
 
 seq_build:
 	gcc -O3 -o bin/blur_seq blur_seq.c -lm;
 thread_build:
 	gcc -O3 -o bin/blur_threads blur_threads.c -lm;
+thread_seq_build:
+	gcc -O3 -o bin/blur_thread_seq blur_thread_seq.c -lm;
 omp_build:
 	#export OMPI_CC=gcc-7
 	#gcc -O3 blur_omp.c -fopenmp -o bin/blur_omp -lm
@@ -15,6 +17,12 @@ threads: thread_build
 		time bin/blur_threads in/image$$number.bmp 3 9 out/image_threads$$number.bmp; \
 		echo $$(diff out/image_ref$$number.bmp out/image_threads$$number.bmp); \
 	done
+thread_seq: thread_build_seq
+	for number in 1 2 3 4 5 ; do \
+		time bin/blur_thread_seq in/image$$number.bmp 3 9 out/image_threadsseq$$number.bmp; \
+		echo $$(diff out/image_ref$$number.bmp out/image_threadsseq$$number.bmp); \
+	done
+
 
 omp: omp_build
 	touch hostfile

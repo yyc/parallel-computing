@@ -1,14 +1,18 @@
 buildall: seq_build thread_build omp_build
 
 seq_build:
+	mkdir -p bin out
 	gcc -O3 -o bin/blur_seq blur_seq.c -lm;
 thread_build:
+	mkdir -p bin out
 	gcc -O3 -o bin/blur_threads blur_threads.c -lm -pthread;
 thread_seq_build:
+	mkdir -p bin out
 	gcc -O3 -o bin/blur_thread_seq blur_thread_seq.c -lm;
 omp_build:
 	#export OMPI_CC=gcc-7
 	#gcc -O3 blur_omp.c -fopenmp -o bin/blur_omp -lm
+	mkdir -p bin out
 	mpicc -O3 -o bin/blur_omp blur_omp.c -lm -fopenmp;
 
 
@@ -37,6 +41,9 @@ seq: seq_build
 	done
 
 2a: thread_seq_build thread_build  omp_build
-	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_thread_seq in/image6.bmp 3 9 out/image_seq6.bmp;
-	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_threads in/image6.bmp 3 9 out/image_threads6.bmp;
-	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" mpirun -hostfile hostfile -np 1 bin/blur_omp in/image6.bmp 3 9 out/image_omp6.bmp;
+	for cores in 0 1 3 5 7 ; do \
+		echo "====USING $$cores CORES ==="; \
+		numactl --physcpubind=0-$$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_thread_seq in/image6.bmp 3 9 out/image_seq6.bmp; \
+		numactl --physcpubind=0-$$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_threads in/image6.bmp 3 9 out/image_threads6.bmp; \
+		numactl --physcpubind=0-$$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" mpirun -hostfile hostfile -np 1 bin/blur_omp in/image6.bmp 3 9 out/image_omp6.bmp; \
+	done

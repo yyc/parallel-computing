@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <pthread.h>
+#include <time.h>
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
@@ -109,12 +110,15 @@ void* assemble_segment(void *write_info_ptr) {
   float *dataB = info->dataB, *dataG = info->dataG, *dataR = info->dataR;
   int    heightlimit = MIN(info->height, info->row + info->numrows);
 
-  for (int i = info->row; i < heightlimit; i++) { //
+  int i;
+
+  for (i = info->row; i < heightlimit; i++) { //
     // Rows
     int write_offset = i * info->row_padded;
     int read_offset  = i * info->width;
+    int j;
 
-    for (int j = 0; j < info->row_padded / 3; j++) {
+    for (j = 0; j < info->row_padded / 3; j++) {
       if (j < info->width) {
         write_buf[write_offset + 3 *
                   j] = (unsigned char)dataB[read_offset + j];
@@ -337,6 +341,7 @@ int main(int argc, char **argv)
   int blur_size, ret_code = 0, size, width, height, offset, row_padded;
   char  *in_filename, *out_filename;
   float *dstB, *dstR, *dstG, sigma;
+  int    i;
 
   long long time_difference, start_time;
 
@@ -429,7 +434,7 @@ int main(int argc, char **argv)
   pthread_t threads[NUM_THREADS];
   int threadcount = 0;
 
-  for (int i = 0; i < height; i += increment) {
+  for (i = 0; i < height; i += increment) {
     struct write_info *info = (struct write_info *)malloc(
       sizeof(struct write_info));
 
@@ -451,7 +456,7 @@ int main(int argc, char **argv)
     pthread_create(&threads[threadcount++], NULL, assemble_segment, info);
   }
 
-  for (int i = 0; i < NUM_THREADS; i++) {
+  for (i = 0; i < NUM_THREADS; i++) {
     int result = pthread_join(threads[i], NULL);
 
     // printf("Finished Thread with status %d\n", result);

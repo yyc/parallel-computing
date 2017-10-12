@@ -1,13 +1,13 @@
 buildall: seq_build thread_build
 
 seq_build:
-	gcc -O3 -o bin/blur_seq -lm blur_seq.c;
+	gcc -O3 -o bin/blur_seq blur_seq.c -lm;
 thread_build:
-	gcc -O3 -o bin/blur_threads -lm blur_threads.c;
+	gcc -O3 -o bin/blur_threads blur_threads.c -lm;
 omp_build:
-	export OMPI_CC=gcc-7
-	gcc-7 -O3 -lm blur_omp.c -fopenmp -o bin/blur_omp
-	# mpicc -O3 -o bin/blur_omp -lm blur_omp.c;
+	#export OMPI_CC=gcc-7
+	#gcc -O3 blur_omp.c -fopenmp -o bin/blur_omp -lm
+	mpicc -O3 -o bin/blur_omp blur_omp.c -lm;
 
 
 threads: thread_build

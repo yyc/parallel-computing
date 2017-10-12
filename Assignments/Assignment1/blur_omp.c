@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <omp.h>
+#include <time.h>
 
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
@@ -106,13 +107,15 @@ void* assemble_segment(void *write_info_ptr, int row, int numrows) {
   unsigned char     *write_buf = info->write_buf;
   float *dataB = info->dataB, *dataG = info->dataG, *dataR = info->dataR;
   int    heightlimit = MIN(info->height, row + numrows);
+  int    i;
 
-  for (int i = row; i < heightlimit; i++) { //
+  for (i = row; i < heightlimit; i++) { //
     // Rows
     int write_offset = i * info->row_padded;
     int read_offset  = i * info->width;
+    int j;
 
-    for (int j = 0; j < info->row_padded / 3; j++) {
+    for (j = 0; j < info->row_padded / 3; j++) {
       if (j < info->width) {
         write_buf[write_offset + 3 *
                   j] = (unsigned char)dataB[read_offset + j];
@@ -171,6 +174,22 @@ float convolve(const float *kernel, const float *buffer, const int ksize) {
     sum += kernel[i] * buffer[i];
   }
   return sum;
+}
+
+float new_convolve(const float *kernel,
+                   const float *buffer,
+                   const int    ksize,
+                   const int    halfksize,
+                   int          rowstart,
+                   int          rowwidth,
+                   int          bufferindex) {
+  float sum = 0.0f;
+
+  for (int i = 0; i < ksize; i++) {
+    if (rowindex - i < 0) {
+      sum += buffersize
+    }
+  }
 }
 
 void* gaussian_blur(void *blur_info_ptr)
@@ -448,7 +467,9 @@ int main(int argc, char **argv)
 
   #pragma omp parallel for private(thread_id)
 
-  for (int i = 0; i < omp_get_num_procs(); i++) {
+  int i;
+
+  for (i = 0; i < omp_get_num_procs(); i++) {
     struct write_info *info = (struct write_info *)malloc(
       sizeof(struct write_info));
 

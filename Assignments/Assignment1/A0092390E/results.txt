@@ -1,0 +1,97 @@
+mkdir -p bin out
+gcc -O3 -o bin/blur_thread_seq blur_thread_seq.c -lm;
+mkdir -p bin out
+gcc -O3 -o bin/blur_threads blur_threads.c -lm -pthread;
+#export OMPI_CC=gcc-7
+#gcc -O3 blur_omp.c -fopenmp -o bin/blur_omp -lm
+mkdir -p bin out
+mpicc -O3 -o bin/blur_omp blur_omp.c -lm -fopenmp;
+for cores in 0 1 3 5 7 ; do \
+		echo "====USING $cores CORES ==="; \
+		echo "====SEQ===="; \
+		numactl --physcpubind=0-$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_thread_seq in/image6.bmp 3 9 out/image_seq6.bmp; \
+		echo "====THREAD===="; \
+		numactl --physcpubind=0-$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/blur_threads in/image6.bmp 3 9 out/image_threads6.bmp; \
+		echo "====OMP===="; \
+		numactl --physcpubind=0-$cores /usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" mpirun -hostfile hostfile -np 1 bin/blur_omp in/image6.bmp 3 9 out/image_omp6.bmp; \
+	done
+====USING 0 CORES ===
+====SEQ====
+Real Time 2.29
+CPU Time 2.25
+Kernel Time 0.04
+Context Switches 1
+====THREAD====
+Real Time 2.30
+CPU Time 2.26
+Kernel Time 0.04
+Context Switches 5
+====OMP====
+Real Time 2.89
+CPU Time 2.23
+Kernel Time 0.05
+Context Switches 204
+====USING 1 CORES ===
+====SEQ====
+Real Time 2.30
+CPU Time 2.25
+Kernel Time 0.05
+Context Switches 1
+====THREAD====
+Real Time 1.25
+CPU Time 2.38
+Kernel Time 0.05
+Context Switches 4
+====OMP====
+Real Time 1.29
+CPU Time 2.45
+Kernel Time 0.04
+Context Switches 199
+====USING 3 CORES ===
+====SEQ====
+Real Time 2.32
+CPU Time 2.27
+Kernel Time 0.04
+Context Switches 1
+====THREAD====
+Real Time 0.92
+CPU Time 2.60
+Kernel Time 0.05
+Context Switches 5
+====OMP====
+Real Time 0.94
+CPU Time 2.60
+Kernel Time 0.06
+Context Switches 197
+====USING 5 CORES ===
+====SEQ====
+Real Time 2.40
+CPU Time 2.34
+Kernel Time 0.05
+Context Switches 1
+====THREAD====
+Real Time 0.92
+CPU Time 2.61
+Kernel Time 0.04
+Context Switches 8
+====OMP====
+Real Time 0.94
+CPU Time 2.62
+Kernel Time 0.05
+Context Switches 199
+====USING 7 CORES ===
+====SEQ====
+Real Time 2.30
+CPU Time 2.26
+Kernel Time 0.04
+Context Switches 1
+====THREAD====
+Real Time 0.93
+CPU Time 2.65
+Kernel Time 0.05
+Context Switches 7
+====OMP====
+Real Time 0.94
+CPU Time 2.63
+Kernel Time 0.05
+Context Switches 207

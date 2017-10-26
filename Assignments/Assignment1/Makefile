@@ -1,4 +1,4 @@
-buildall: seq_build thread_build omp_build
+runall: omp seq threads
 
 seq_build:
 	mkdir -p bin out
@@ -13,6 +13,7 @@ omp_build:
 	#export OMPI_CC=gcc-7
 	#gcc -O3 blur_omp.c -fopenmp -o bin/blur_omp -lm
 	mkdir -p bin out
+	touch hostfile
 	mpicc -O3 -o bin/blur_omp blur_omp.c -lm -fopenmp;
 
 
@@ -29,7 +30,6 @@ thread_seq: thread_seq_build
 
 
 omp: omp_build
-	touch hostfile
 	for number in 1 2 3 4 5 ; do \
 		/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w"  mpirun -hostfile hostfile -np 1 bin/blur_omp in/image$$number.bmp 3 9 out/image_omp$$number.bmp; \
 		echo $$(diff out/image_ref$$number.bmp out/image_omp$$number.bmp); \

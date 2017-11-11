@@ -63,6 +63,33 @@ void allocate_matrix(matrix* m)
 	}
 }
 
+void allocate_3d(matrix* m) {
+	int i, j;
+	cudaError_t rc;
+
+	// allocate array for all the rows
+	rc = cudaMallocManaged((void**)&(m->element), sizeof(float*) * size);
+	if (rc != cudaSuccess)
+	{
+		fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(rc));
+		exit(1);
+	}
+
+	// allocate an array for each row of the matrix
+	for (i = 0; i < size; i++)
+	{
+		rc = cudaMallocManaged((void**)&(m->element[i]), sizeof(float*) * size);
+		if (rc != cudaSuccess)
+		{
+			fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(rc));
+			exit(1);
+		}
+		for(j = 0; j < size; j++) {
+			rc = cudaMallocManaged((void**)&(m->element[i][j]), sizeof(float*) * size);
+		}
+	}
+}
+
 /**
  * Free the memory allocated for a matrix.
  **/
@@ -103,6 +130,26 @@ void init_matrix_zero(matrix m)
 		}
 }
 
+void matrix_transpose(matrix src, matrix dest) {
+	int i,j;
+	for(i = 0; i < size; i++) {
+		for(j = 0; j < size; j++) {
+			dest.element[i][j] = src.element[j][i];
+		}
+	}
+}
+
+__global__ void transpose_kernel(matrix src, matrix dest, int size) {
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	int j = blockIdx.y * blockDim.y + threadIdx.y;
+	if(i >= size || j >= size)		return;
+
+	dest.element[i][j] = src.element[j][i];
+}
+
+__global__ void multiply_kernel(matrix src, matrix dest, int size) {
+
+}
 
 /**
  * Multiplies matrix @a with matrix @b storing
@@ -135,7 +182,7 @@ __global__ void mm_kernel(matrix a, matrix b, matrix result, int size)
 		return;
 
 	for(k = 0; k < size; k++)
-		result.element[i][j] += a.element[i][k] * b.element[k][j];
+		result.element[i][j] += a.element[i][k] * b.element[j][k];
 }
 
 void print_matrix(matrix m)
@@ -155,7 +202,7 @@ void print_matrix(matrix m)
 
 void work()
 {
-	matrix a, b, result1, result2;
+	matrix a, b, bt, result1, result2;
 	long long before, after;
 	float seqtime, gputime;
 	int correct, i, j, dim;
@@ -164,6 +211,7 @@ void work()
 	// Allocate memory for matrices
 	allocate_matrix(&a);
 	allocate_matrix(&b);
+	allocate_matrix(&bt);
 	allocate_matrix(&result1);
 	allocate_matrix(&result2);
 
@@ -179,11 +227,21 @@ void work()
         fprintf(stderr, "Matrix multiplication on CPU took %1.2f seconds\n", seqtime);
 
 	// Perform CUDA matrix  multiplication
-	dim3 block(32, 32);			// a block of 32 x 32 CUDA threads
+	dim3 transblock(32, 32);
 	dim = (size % 32 == 0) ? size / 32 : size / 32 + 1;
-	dim3 grid(dim, dim);	// a grid of CUDA thread blocks
+	dim3 transgrid(dim, dim);
+
+	dim3 block(32, 1);			// a block of 32 x 32 CUDA threads
+	dim3 grid(size, size);	// a grid of CUDA thread blocks
 	before = wall_clock_time();
-	mm_kernel<<<grid, block>>>(a, b, result2, size);
+
+	init_matrix_zero(bt);
+  transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
+
+	mm_kernel<<<transgrid, transblock>>>(a, bt, result2, size);
+//	multiply_kernel<<<grid, block>>>(a, bt, b, size);
+//  sum_kernel<<<grid, block>>>(a, bt, result2, size);
+
 	cudaDeviceSynchronize();
 	after = wall_clock_time();
 	gputime = ((float)(after - before))/1000000000;
@@ -207,9 +265,11 @@ void work()
 		printf("The result matrices are identical!\n");
 		printf("Speedup: %1.4f\n", seqtime/gputime);
 	}
-	else
+	else {
 		printf("Difference in result matrices at element (%d, %d)!\n", i, j);
-
+		// print_matrix(result1);
+		// print_matrix(result2);
+	}
 	free_matrix(&a);
 	free_matrix(&b);
 	free_matrix(&result1);

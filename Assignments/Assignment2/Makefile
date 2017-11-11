@@ -8,11 +8,13 @@ cuda_build:
 	nvcc -o bin/mm-cuda -arch=sm_32 -lm -ccbin clang-3.8 mm-cuda.cu
 optimized_build:
 	mkdir -p bin out
-	nvcc -o bin/mm_optimized -arch=sm_32 -lm -ccbin clang-3.8 mm_optimized.cu
+	nvcc -o bin/mm-optimized -arch=sm_32 -lm -ccbin clang-3.8 mm-optimized.cu
 
 
 cuda: cuda_build
 	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/mm-cuda 1000;
+optimized: optimized_build
+	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/mm-optimized 1000;
 
 
 threads: thread_build

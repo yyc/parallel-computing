@@ -177,12 +177,15 @@ __global__ void mm_kernel(matrix a, matrix b, matrix result, int size)
 	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	int j = blockIdx.y * blockDim.y + threadIdx.y;
 	int k;
+	float sum = 0.0f;
 
 	if (i >= size || j >= size)
 		return;
 
 	for(k = 0; k < size; k++)
-		result.element[i][j] += a.element[i][k] * b.element[j][k];
+		sum += a.element[i][k] * b.element[j][k];
+	result.element[i][j] = sum;
+
 }
 
 void print_matrix(matrix m)

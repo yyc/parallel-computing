@@ -1,5 +1,5 @@
 /**
- * 
+ *
  * Matrix Multiplication - CUDA for GPUs
  *
  * CS3210
@@ -34,15 +34,15 @@ long long wall_clock_time()
 
 /**
  * Allocates memory for a matrix of size SIZE
- * The memory is allocated row-major order, i.e. 
- *  elements from the same row are allocated at contiguous 
+ * The memory is allocated row-major order, i.e.
+ *  elements from the same row are allocated at contiguous
  *  memory addresses.
  **/
 void allocate_matrix(matrix* m)
 {
 	int i;
 	cudaError_t rc;
-	
+
 	// allocate array for all the rows
 	rc = cudaMallocManaged((void**)&(m->element), sizeof(float*) * size);
 	if (rc != cudaSuccess)
@@ -50,7 +50,7 @@ void allocate_matrix(matrix* m)
 		fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(rc));
 		exit(1);
 	}
-	
+
 	// allocate an array for each row of the matrix
 	for (i = 0; i < size; i++)
 	{
@@ -80,7 +80,7 @@ void free_matrix(matrix* m) {
 void init_matrix(matrix m)
 {
 	int i, j;
-	
+
 	for (i = 0; i < size; i++)
 		for (j = 0; j < size; j++)
 		{
@@ -95,7 +95,7 @@ void init_matrix(matrix m)
 void init_matrix_zero(matrix m)
 {
 	int i, j;
-	
+
 	for (i = 0; i < size; i++)
 		for (j = 0; j < size; j++)
 		{
@@ -107,14 +107,14 @@ void init_matrix_zero(matrix m)
 /**
  * Multiplies matrix @a with matrix @b storing
  * the result in matrix @result
- * 
- * The multiplication algorithm is the O(n^3) 
+ *
+ * The multiplication algorithm is the O(n^3)
  * algorithm
  */
 void mm(matrix a, matrix b, matrix result)
 {
 	int i, j, k;
-	
+
 	// Do the multiplication
 	for (i = 0; i < size; i++)
 		for (j = 0; j < size; j++)
@@ -127,7 +127,7 @@ void mm(matrix a, matrix b, matrix result)
  */
 __global__ void mm_kernel(matrix a, matrix b, matrix result, int size)
 {
-	int i = blockIdx.x * blockDim.x + threadIdx.x; 
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	int j = blockIdx.y * blockDim.y + threadIdx.y;
 	int k;
 
@@ -141,7 +141,7 @@ __global__ void mm_kernel(matrix a, matrix b, matrix result, int size)
 void print_matrix(matrix m)
 {
 	int i, j;
-	
+
 	for (i = 0; i < size; i++)
 	{
 		printf("row %4d: ", i);
@@ -157,6 +157,7 @@ void work()
 {
 	matrix a, b, result1, result2;
 	long long before, after;
+	float seqtime, gputime;
 	int correct, i, j, dim;
 	cudaError_t rc;
 
@@ -164,7 +165,7 @@ void work()
 	allocate_matrix(&a);
 	allocate_matrix(&b);
 	allocate_matrix(&result1);
-	allocate_matrix(&result2);	
+	allocate_matrix(&result2);
 
 	// Initialize matrix elements
 	init_matrix(a);
@@ -174,17 +175,19 @@ void work()
 	before = wall_clock_time();
 	mm(a, b, result1);
 	after = wall_clock_time();
-        fprintf(stderr, "Matrix multiplication on CPU took %1.2f seconds\n", ((float)(after - before))/1000000000);
+	seqtime = ((float)(after - before))/1000000000;
+        fprintf(stderr, "Matrix multiplication on CPU took %1.2f seconds\n", seqtime);
 
 	// Perform CUDA matrix  multiplication
 	dim3 block(32, 32);			// a block of 32 x 32 CUDA threads
-	dim = (size % 32 == 0) ? size / 32 : size / 32 + 1; 
+	dim = (size % 32 == 0) ? size / 32 : size / 32 + 1;
 	dim3 grid(dim, dim);	// a grid of CUDA thread blocks
 	before = wall_clock_time();
 	mm_kernel<<<grid, block>>>(a, b, result2, size);
 	cudaDeviceSynchronize();
 	after = wall_clock_time();
-	fprintf(stderr, "Matrix multiplication on GPU took %1.2f seconds\n", ((float)(after - before))/1000000000);
+	gputime = ((float)(after - before))/1000000000;
+	fprintf(stderr, "Matrix multiplication on GPU took %1.2f seconds\n", gputime);
 
 	// was there any error?
         rc = cudaGetLastError();
@@ -200,8 +203,10 @@ void work()
 				break;
 			}
 
-	if (correct)
+	if (correct) {
 		printf("The result matrices are identical!\n");
+		printf("Speedup: %1.4f", seqtime/gputime);
+	}
 	else
 		printf("Difference in result matrices at element (%d, %d)!\n", i, j);
 
@@ -214,17 +219,17 @@ void work()
 
 int main(int argc, char ** argv)
 {
-	srand(0); 
+	srand(0);
 
 	printf("Usage: %s <size>\n", argv[0]);
-    
+
 	if (argc >= 2)
 		size = atoi(argv[1]);
 	else
 		size = 1024;
-		
+
 	fprintf(stderr,"Sequential matrix multiplication of size %d\n", size);
-    
+
 	// Multiply the matrices
 	work();
 

@@ -114,10 +114,13 @@ __global__ void transpose_kernel(matrix src, matrix dest, int size) {
 	dest.element[i][j] = src.element[j][i];
 }
 
+// SHARED MEMORY KERNEL HERE
 __global__ void sm_kernel(matrix a, matrix b, matrix result, int size)
 {
+	// Initialize shared memory
 	__shared__ float aMat[BLOCKSIZE][BLOCKSIZE];
 	__shared__ float bMat[BLOCKSIZE][BLOCKSIZE];
+	// Calculate the index in the resulting matrix
 	int i = (blockIdx.x) * blockDim.x + threadIdx.x;
 	int j = (blockIdx.y) * blockDim.y + threadIdx.y;
 	int k, m, numBlocks;
@@ -125,6 +128,7 @@ __global__ void sm_kernel(matrix a, matrix b, matrix result, int size)
 
 // Require M blocks to finish
 	numBlocks = ((size % BLOCKSIZE) == 0) ? (size / BLOCKSIZE) : (size / BLOCKSIZE + 1);
+
 	// For each block in turn
 	for(k = 0; k < numBlocks; k++){
 		// each thread copy one element to the buffer
@@ -132,11 +136,13 @@ __global__ void sm_kernel(matrix a, matrix b, matrix result, int size)
 		bMat[threadIdx.y][threadIdx.x] = b.element[j][k * BLOCKSIZE + threadIdx.x];
 		__syncthreads();
 
+		// Do a partial sum of all available elements
 		for(m = 0; m < BLOCKSIZE; m++)
 			sum += aMat[threadIdx.x][m] * bMat[threadIdx.y][m];
 		__syncthreads();
 	}
 
+	// When done, the sum is complete and we write it back to global
 	result.element[i][j] = sum;
 }
 

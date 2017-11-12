@@ -226,7 +226,7 @@ void work()
 	dim = paddedSize / BLOCKSIZE;
 	dim3 grid(dim , dim );	// a grid of CUDA thread blocks
 	before = wall_clock_time();
-
+	init_matrix_zero(bt);
 	transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
 	cudaDeviceSynchronize();
 

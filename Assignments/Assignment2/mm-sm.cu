@@ -12,7 +12,7 @@
 #include <assert.h>
 
 int size;
-
+#define BLOCKSIZE 4
 
 typedef struct
 {
@@ -112,37 +112,37 @@ __global__ void transpose_kernel(matrix src, matrix dest, int size) {
 	dest.element[i][j] = src.element[j][i];
 }
 
-__global__ void multiply_kernel(matrix a, matrix b, matrix dest, int dim, int size) {
-	extern __shared__ float temp[];
-	int i;
-	int offset = threadIdx.x * blockDim.x;
-	float sum = 0.0f;
-	for(i = offset; i < size; i++ ){
-		sum +=  a.element[blockIdx.x][i] * b.element[blockIdx.y][i];
-	}
-	temp[threadIdx.x] = sum;
-	__syncthreads();
-	sum = 0.0f;
-	if(threadIdx.x == 0) {
-		for(i = 0; i < dim; i++) {
-			sum += temp[i];
-		}
-		dest.element[blockIdx.x][blockIdx.y] = sum;
-	}
-}
-
 __global__ void sm_kernel(matrix a, matrix b, matrix result, int size)
 {
+	__shared__ float aMat[BLOCKSIZE][BLOCKSIZE];
+	__shared__ float bMat[BLOCKSIZE][BLOCKSIZE];
 	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	int j = blockIdx.y * blockDim.y + threadIdx.y;
-	int k;
+	int k, m, numBlocks;
 	float sum = 0.0f;
 
 	if (i >= size || j >= size)
 		return;
 
-	for(k = 0; k < size; k++)
-		sum += a.element[i][k] * b.element[j][k];
+
+	// Require M blocks to finish
+	numBlocks = ((size % BLOCKSIZE) == 0) ? (size / BLOCKSIZE) : (size / BLOCKSIZE + 1);
+
+	// For each block in turn
+	for(k = 0; k < numBlocks; k++){
+		// each thread copy one element to the buffer
+		aMat[threadIdx.x][threadIdx.y] = a.element[i][k * BLOCKSIZE + threadIdx.y];
+		bMat[threadIdx.y][threadIdx.x] = b.element[j][k * BLOCKSIZE + threadIdx.x];
+
+		__syncthreads();
+
+		for(m = 0; m < BLOCKSIZE && k * BLOCKSIZE + m < size; m++)
+			sum += aMat[threadIdx.x][m] * bMat[threadIdx.y][m];
+
+		__syncthreads();
+	}
+
+
 	result.element[i][j] = sum;
 }
 
@@ -198,41 +198,49 @@ void work()
 	init_matrix(a);
 	init_matrix(b);
 
+
 	// Perform CUDA matrix  multiplication
 	dim3 transblock(32, 32);
 	dim = (size % 32 == 0) ? size / 32 : size / 32 + 1;
 	dim3 transgrid(dim, dim);
+
 	before = wall_clock_time();
 	init_matrix_zero(bt);
-  transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
+	transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
+	cudaDeviceSynchronize();
 	mm_kernel<<<transgrid, transblock>>>(a, bt, result1, size);
 	cudaDeviceSynchronize();
 	after = wall_clock_time();
 	time1 = ((float)(after - before))/1000000000;
 	fprintf(stderr, "Optimized MM on GPU took %1.2f seconds\n", time1);
-
-
-	dim3 block(32, 1);			// a block of 32 x 32 CUDA threads
-	dim = (size % 32 == 0) ? size / 32 : size / 32 + 1;
-	dim3 grid(size, size);	// a grid of CUDA thread blocks
-	before = wall_clock_time();
-
-	init_matrix_zero(bt);
-  transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
-
-	sm_kernel<<<transgrid, transblock>>>(a, bt, result2, size);
-//	multiply_kernel<<<grid, block, dim * sizeof(float)>>>(a, bt, result2, dim, size);
-	cudaDeviceSynchronize();
-//  sum_kernel<<<transgrid, transblock>>>(result2, size);
-	after = wall_clock_time();
-	time2 = ((float)(after - before))/1000000000;
-	fprintf(stderr, "SM MM on GPU took %1.2f seconds\n", time2);
-
-
 	// was there any error?
     rc = cudaGetLastError();
     if (rc != cudaSuccess)
             printf("Last CUDA error %s\n", cudaGetErrorString(rc));
+
+
+	dim3 block(BLOCKSIZE, BLOCKSIZE);			// a block of 32 x 32 CUDA threads
+	dim = (size % BLOCKSIZE == 0) ? size / BLOCKSIZE : size / BLOCKSIZE + 1;
+	dim3 grid(dim, dim);	// a grid of CUDA thread blocks
+	before = wall_clock_time();
+
+	transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
+	cudaDeviceSynchronize();
+
+	sm_kernel<<<block, block>>>(a, bt, result2, size);
+//	multiply_kernel<<<grid, block, dim * sizeof(float)>>>(a, bt, result2, dim, size);
+//  sum_kernel<<<transgrid, transblock>>>(result2, size);
+	cudaDeviceSynchronize();
+
+	after = wall_clock_time();
+	time2 = ((float)(after - before))/1000000000;
+	fprintf(stderr, "SM MM on GPU took %1.2f seconds\n", time2);
+	// was there any error?
+    rc = cudaGetLastError();
+    if (rc != cudaSuccess)
+            printf("Last CUDA error %s\n", cudaGetErrorString(rc));
+
+
 
 	// Compare the results
 	correct = 1;
@@ -249,8 +257,8 @@ void work()
 	}
 	else {
 		printf("Difference in result matrices at element (%d, %d)!\n", i, j);
-		// print_matrix(result1);
-		// print_matrix(result2);
+		print_matrix(result1);
+		print_matrix(result2);
 	}
 	free_matrix(&a);
 	free_matrix(&b);

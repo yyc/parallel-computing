@@ -10,8 +10,9 @@
 #include <time.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <math.h>
 
-int size;
+int size, paddedSize;
 #define BLOCKSIZE 4
 
 typedef struct
@@ -45,7 +46,7 @@ void allocate_matrix(matrix* m)
 	cudaError_t rc;
 
 	// allocate array for all the rows
-	rc = cudaMallocManaged((void**)&(m->element), sizeof(float*) * size);
+	rc = cudaMallocManaged((void**)&(m->element), sizeof(float*) * paddedSize);
 	if (rc != cudaSuccess)
 	{
 		fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(rc));
@@ -53,9 +54,9 @@ void allocate_matrix(matrix* m)
 	}
 
 	// allocate an array for each row of the matrix
-	for (i = 0; i < size; i++)
+	for (i = 0; i < paddedSize; i++)
 	{
-		rc = cudaMallocManaged((void**)&(m->element[i]), sizeof(float) * size);
+		rc = cudaMallocManaged((void**)&(m->element[i]), sizeof(float) * paddedSize);
 		if (rc != cudaSuccess)
 		{
 			fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(rc));
@@ -69,7 +70,7 @@ void allocate_matrix(matrix* m)
  **/
 void free_matrix(matrix* m) {
 	int i;
-	for (i = 0; i < size; i++)
+	for (i = 0; i < paddedSize; i++)
 		cudaFree(m->element[i]);
 	cudaFree(m->element);
 }
@@ -85,7 +86,8 @@ void init_matrix(matrix m)
 	for (i = 0; i < size; i++)
 		for (j = 0; j < size; j++)
 		{
-			m.element[i][j] = rand() % 10;
+			// m.element[i][j] = rand() % 10;
+			m.element[i][j] = 1;
 		}
 }
 
@@ -97,8 +99,8 @@ void init_matrix_zero(matrix m)
 {
 	int i, j;
 
-	for (i = 0; i < size; i++)
-		for (j = 0; j < size; j++)
+	for (i = 0; i < paddedSize; i++)
+		for (j = 0; j < paddedSize; j++)
 		{
 			m.element[i][j] = 0.0;
 		}
@@ -116,32 +118,24 @@ __global__ void sm_kernel(matrix a, matrix b, matrix result, int size)
 {
 	__shared__ float aMat[BLOCKSIZE][BLOCKSIZE];
 	__shared__ float bMat[BLOCKSIZE][BLOCKSIZE];
-	int i = blockIdx.x * blockDim.x + threadIdx.x;
-	int j = blockIdx.y * blockDim.y + threadIdx.y;
+	int i = (blockIdx.x) * blockDim.x + threadIdx.x;
+	int j = (blockIdx.y) * blockDim.y + threadIdx.y;
 	int k, m, numBlocks;
 	float sum = 0.0f;
 
-	if (i >= size || j >= size)
-		return;
-
-
-	// Require M blocks to finish
+// Require M blocks to finish
 	numBlocks = ((size % BLOCKSIZE) == 0) ? (size / BLOCKSIZE) : (size / BLOCKSIZE + 1);
-
 	// For each block in turn
 	for(k = 0; k < numBlocks; k++){
 		// each thread copy one element to the buffer
 		aMat[threadIdx.x][threadIdx.y] = a.element[i][k * BLOCKSIZE + threadIdx.y];
 		bMat[threadIdx.y][threadIdx.x] = b.element[j][k * BLOCKSIZE + threadIdx.x];
-
 		__syncthreads();
 
-		for(m = 0; m < BLOCKSIZE && k * BLOCKSIZE + m < size; m++)
+		for(m = 0; m < BLOCKSIZE; m++)
 			sum += aMat[threadIdx.x][m] * bMat[threadIdx.y][m];
-
 		__syncthreads();
 	}
-
 
 	result.element[i][j] = sum;
 }
@@ -195,6 +189,8 @@ void work()
 	allocate_matrix(&result2);
 
 	// Initialize matrix elements
+	init_matrix_zero(a);
+	init_matrix_zero(b);
 	init_matrix(a);
 	init_matrix(b);
 
@@ -208,7 +204,7 @@ void work()
 	init_matrix_zero(bt);
 	transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
 	cudaDeviceSynchronize();
-	mm_kernel<<<transgrid, transblock>>>(a, bt, result1, size);
+	mm_kernel<<<transblock, transgrid>>>(a, bt, result1, size);
 	cudaDeviceSynchronize();
 	after = wall_clock_time();
 	time1 = ((float)(after - before))/1000000000;
@@ -220,16 +216,16 @@ void work()
 
 
 	dim3 block(BLOCKSIZE, BLOCKSIZE);			// a block of 32 x 32 CUDA threads
-	dim = (size % BLOCKSIZE == 0) ? size / BLOCKSIZE : size / BLOCKSIZE + 1;
-	dim3 grid(dim, dim);	// a grid of CUDA thread blocks
+	// dim = (size % BLOCKSIZE == 0) ? size / BLOCKSIZE : size / BLOCKSIZE + 1;
+	dim = paddedSize / BLOCKSIZE;
+	dim3 grid(dim , dim );	// a grid of CUDA thread blocks
 	before = wall_clock_time();
 
 	transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
 	cudaDeviceSynchronize();
 
-	sm_kernel<<<block, block>>>(a, bt, result2, size);
-//	multiply_kernel<<<grid, block, dim * sizeof(float)>>>(a, bt, result2, dim, size);
-//  sum_kernel<<<transgrid, transblock>>>(result2, size);
+	// fprintf(stderr,"Starting SM with blocksize %dx%d and grid %dx%d", BLOCKSIZE, BLOCKSIZE, dim, dim);
+	sm_kernel<<<grid, block>>>(a, bt, result2, size);
 	cudaDeviceSynchronize();
 
 	after = wall_clock_time();
@@ -257,8 +253,8 @@ void work()
 	}
 	else {
 		printf("Difference in result matrices at element (%d, %d)!\n", i, j);
-		print_matrix(result1);
-		print_matrix(result2);
+		// print_matrix(result1);
+		// print_matrix(result2);
 	}
 	free_matrix(&a);
 	free_matrix(&b);
@@ -278,6 +274,7 @@ int main(int argc, char ** argv)
 	else
 		size = 1024;
 
+	paddedSize = (size % BLOCKSIZE == 0) ? size : (1 + size / BLOCKSIZE) * BLOCKSIZE;
 	fprintf(stderr,"Sequential matrix multiplication of size %d\n", size);
 
 	// Multiply the matrices

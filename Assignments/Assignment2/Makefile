@@ -19,7 +19,7 @@ cuda: cuda_build
 optimized: optimized_build
 	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/mm-optimized 1000;
 sm: sm_build
-	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/mm-sm 5;
+	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" bin/mm-sm 1000;
 
 
 threads: thread_build

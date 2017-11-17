@@ -13,7 +13,7 @@
 #include <math.h>
 
 int size, paddedSize;
-#define BLOCKSIZE 4
+#define BLOCKSIZE 192
 
 typedef struct
 {

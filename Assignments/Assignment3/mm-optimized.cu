@@ -12,6 +12,7 @@
 #include <assert.h>
 
 int size;
+#define BLOCKSIZE 192
 
 typedef struct
 {
@@ -230,20 +231,16 @@ void work()
         fprintf(stderr, "Matrix multiplication on CPU took %1.2f seconds\n", seqtime);
 
 	// Perform CUDA matrix  multiplication
-	dim3 transblock(32, 32);
-	dim = (size % 32 == 0) ? size / 32 : size / 32 + 1;
+	dim3 transblock(BLOCKSIZE, BLOCKSIZE);
+	dim = (size % BLOCKSIZE == 0) ? size /BLOCKSIZE : size / BLOCKSIZE + 1;
 	dim3 transgrid(dim, dim);
 
-	dim3 block(32, 1);			// a block of 32 x 32 CUDA threads
-	dim3 grid(size, size);	// a grid of CUDA thread blocks
 	before = wall_clock_time();
 
 	init_matrix_zero(bt);
   transpose_kernel<<<transgrid, transblock>>>(b, bt, size);
 
 	mm_kernel<<<transgrid, transblock>>>(a, bt, result2, size);
-//	multiply_kernel<<<grid, block>>>(a, bt, b, size);
-//  sum_kernel<<<grid, block>>>(a, bt, result2, size);
 
 	cudaDeviceSynchronize();
 	after = wall_clock_time();

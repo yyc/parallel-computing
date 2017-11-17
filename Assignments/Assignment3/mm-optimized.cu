@@ -284,14 +284,14 @@ int main(int argc, char ** argv)
 {
 	srand(0);
 
-	printf("Usage: %s <size>\n", argv[0]);
+//	printf("Usage: %s <size>\n", argv[0]);
 
 	if (argc >= 2)
 		size = atoi(argv[1]);
 	else
 		size = 1024;
 
-	fprintf(stderr,"Sequential matrix multiplication of size %d\n", size);
+	fprintf(stderr,"Sequential/Optimized Matrix Multiplication of size %d\n", size);
 
 	// Multiply the matrices
 	work();

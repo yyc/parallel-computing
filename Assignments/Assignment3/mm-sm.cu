@@ -254,7 +254,7 @@ void work()
 			}
 
 	if (correct) {
-		printf("The result matrices are identical!\n");
+		//printf("The result matrices are identical!\n");
 		printf("Speedup: %1.4f\n", time1/time2);
 	}
 	else {
@@ -273,7 +273,7 @@ int main(int argc, char ** argv)
 {
 	srand(0);
 
-	printf("Usage: %s <size>\n", argv[0]);
+	// printf("Usage: %s <size>\n", argv[0]);
 
 	if (argc >= 2)
 		size = atoi(argv[1]);
@@ -281,7 +281,7 @@ int main(int argc, char ** argv)
 		size = 1024;
 
 	paddedSize = (size % BLOCKSIZE == 0) ? size : (1 + size / BLOCKSIZE) * BLOCKSIZE;
-	fprintf(stderr,"Sequential matrix multiplication of size %d\n", size);
+	fprintf(stderr,"Optimized/SM multiplication of size %d\n", size);
 
 	// Multiply the matrices
 	work();

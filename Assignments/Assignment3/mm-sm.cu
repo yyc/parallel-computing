@@ -13,7 +13,7 @@
 #include <math.h>
 
 int size, paddedSize;
-#define BLOCKSIZE 64
+#define BLOCKSIZE 32
 
 typedef struct
 {
@@ -205,6 +205,10 @@ void work()
 	dim3 transblock(32, 32);
 	dim = (size % 32 == 0) ? size / 32 : size / 32 + 1;
 	dim3 transgrid(dim, dim);
+	dim3 block(BLOCKSIZE, BLOCKSIZE);			// a block of 32 x 32 CUDA threads
+	// dim = (size % BLOCKSIZE == 0) ? size / BLOCKSIZE : size / BLOCKSIZE + 1;
+	dim = paddedSize / BLOCKSIZE;
+	dim3 grid(dim , dim );	// a grid of CUDA thread blocks
 
 	before = wall_clock_time();
 	init_matrix_zero(bt);
@@ -221,10 +225,6 @@ void work()
             printf("Last CUDA error %s\n", cudaGetErrorString(rc));
 
 
-	dim3 block(BLOCKSIZE, BLOCKSIZE);			// a block of 32 x 32 CUDA threads
-	// dim = (size % BLOCKSIZE == 0) ? size / BLOCKSIZE : size / BLOCKSIZE + 1;
-	dim = paddedSize / BLOCKSIZE;
-	dim3 grid(dim , dim );	// a grid of CUDA thread blocks
 	before = wall_clock_time();
 	init_matrix_zero(bt);
 	transpose_kernel<<<transgrid, transblock>>>(b, bt, size);

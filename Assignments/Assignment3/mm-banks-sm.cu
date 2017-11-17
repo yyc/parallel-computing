@@ -14,6 +14,7 @@
 
 int size, paddedSize;
 #define BLOCKSIZE 32
+#define BLOCKMASK 31
 
 typedef struct
 {
@@ -171,7 +172,7 @@ __global__ void banks_kernel(matrix a, matrix b, matrix result, int size)
 
 		// Do a partial sum of all available elements
 		for(m = 0; m < BLOCKSIZE; m++ && bank_index++)
-			sum += aMat[threadIdx.x][bank_index % BLOCKSIZE] * bMat[threadIdx.y][bank_index % BLOCKSIZE];
+			sum += aMat[threadIdx.x][bank_index & BLOCKMASK] * bMat[threadIdx.y][bank_index & BLOCKMASK];
 		__syncthreads();
 	}
 

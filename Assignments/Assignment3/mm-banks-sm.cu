@@ -155,7 +155,8 @@ __global__ void banks_kernel(matrix a, matrix b, matrix result, int size)
 	// Calculate the index in the resulting matrix
 	int i = (blockIdx.x) * blockDim.x + threadIdx.x;
 	int j = (blockIdx.y) * blockDim.y + threadIdx.y;
-	int k, m, numBlocks;
+	int k, m, numBlocks, bank_index;
+	bank_index = blockIdx.x;
 	float sum = 0.0f;
 
 // Require M blocks to finish
@@ -169,8 +170,8 @@ __global__ void banks_kernel(matrix a, matrix b, matrix result, int size)
 		__syncthreads();
 
 		// Do a partial sum of all available elements
-		for(m = 0; m < BLOCKSIZE; m++)
-			sum += aMat[threadIdx.x][m] * bMat[threadIdx.y][m];
+		for(m = 0; m < BLOCKSIZE; m++ && bank_index++)
+			sum += aMat[threadIdx.x][bank_index % BLOCKSIZE] * bMat[threadIdx.y][bank_index % BLOCKSIZE];
 		__syncthreads();
 	}
 

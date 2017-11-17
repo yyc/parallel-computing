@@ -1,8 +1,10 @@
+## Run testall to compile and test all 3 programs
+
 buildall: seq_build thread_build omp_build
 
 cuda_build:
 	mkdir -p bin out
-	nvcc -o bin/mm-cuda -arch=sm_32 -lm -ccbin clang-3.8 mm-cuda.cu
+	nvcc -o bin/mm-cuda -arch=sm_32 -lm mm-cuda.cu
 optimized_build:
 	mkdir -p bin out
 	nvcc -o bin/mm-optimized -arch=sm_32 mm-optimized.cu

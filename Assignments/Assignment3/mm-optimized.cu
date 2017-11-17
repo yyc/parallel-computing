@@ -12,7 +12,7 @@
 #include <assert.h>
 
 int size;
-#define BLOCKSIZE 192
+#define BLOCKSIZE 64
 
 typedef struct
 {

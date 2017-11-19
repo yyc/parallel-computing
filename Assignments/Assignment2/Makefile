@@ -8,4 +8,5 @@ training_build: make_dir
 	mpicc -O3 -std=c11 -o bin/training training_mpi.c;
 
 training: training_build
-		mpirun -hostfile hostfile -np 12 bin/training
+		mpirun -hostfile hostfile -np 12 bin/training > training.lab.o; \
+		tail training.lab.o;

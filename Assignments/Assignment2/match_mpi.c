@@ -79,6 +79,13 @@ void field(int rank) {
   // printf("Initiating Master Field Program..\n");
 
   struct playerInfo players[numplayers];
+  MPI_Comm teamComm;
+
+  MPI_Comm_split(MPI_COMM_WORLD,
+                 3,
+                 rank,
+                 &teamComm);
+
 
   if (isRoot) {
     goalX      = (GOAL_TOP + GOAL_BOTTOM) / 2;
@@ -287,20 +294,24 @@ void player(int rank) {
 
   MPI_Comm teamComm;
 
-  MPI_Comm_split(MPI_COMM_WORLD, (rank - 12) / 11, (rank - 12) % 11, &teamComm);
+  MPI_Comm_split(MPI_COMM_WORLD,
+                 (rank - 12) / 11,
+                 (rank - 12) % 11,
+                 &teamComm);
   int teamRank, teamSize;
 
   MPI_Comm_size(teamComm, &teamSize);
   MPI_Comm_rank(teamComm, &teamRank);
-  printf("Player %i has team index %i/%i\n", rank, teamRank, teamSize);
+
+  // printf("Player %i has team index %i/%i\n", rank, teamRank, teamSize);
 
   // Randomly determine stats
   int speed, dribbling, kick;
 
   randDistribution(&speed, &dribbling, &kick);
 
-  printf("%i %i %i  = %i\n", speed, dribbling, kick, speed + dribbling +
-         kick);
+  // printf("%i %i %i  = %i\n", speed, dribbling, kick, speed + dribbling +
+  // kick);
   MPI_Status stat;
 
   int *buffer = (int *)malloc((sizeof(int) * MSG_LENGTH));
@@ -359,8 +370,8 @@ void player(int rank) {
       buffer[2] = posY;
       moveTowards(&buffer[1], &buffer[2], goalX, goalY, kick * 2);
 
-      printf("%i with kick power %i kicked the ball to %i,%i\n", rank, kick,
-             buffer[1], buffer[2]);
+      // printf("%i with kick power %i kicked the ball to %i,%i\n", rank, kick,
+      //        buffer[1], buffer[2]);
 
       // ROUND_END
       broadcast(buffer, rank);
@@ -391,5 +402,8 @@ int main(int argc, char *argv[])
   { // Initialize player
     player(rank);
   }
+
   MPI_Finalize();
+
+  // printf("%i Exited\n", rank);
 }

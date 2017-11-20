@@ -249,6 +249,8 @@ void field(int rank) {
         // Check for out, goals, etc. and update score as necessary
         if (ballY >= goalRightY) {
           if ((ballX <= GOAL_BOTTOM) && (ballX >= GOAL_TOP)) {
+            printf("left %i\n", j);
+
             // Left team scores!
             if (j == 0) { // A defends left and scores right
               aScore += 1;
@@ -261,6 +263,8 @@ void field(int rank) {
         }
         else if (ballY <= goalLeftY) {
           if ((ballX <= GOAL_BOTTOM) && (ballX >= GOAL_TOP)) {
+            printf("right %i\n", j);
+
             // Right team scores!
             if (j == 0) { // A defends right and scores right
               bScore += 1;

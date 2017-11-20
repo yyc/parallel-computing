@@ -105,6 +105,7 @@ void field(int rank) {
     if (isRoot) {
       printf("===Starting Half %i====\n", j);
     }
+    rounds = 0;
 
     // Initialize every player, send them their info
     for (i = 0; i < numplayers; i++) {
@@ -381,6 +382,7 @@ void player(int rank) {
         // posY);
       }
     }
+    rounds = 0;
 
     while (++rounds <= NUMROUNDS) {
       // ROUND_START

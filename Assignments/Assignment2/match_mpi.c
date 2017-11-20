@@ -148,7 +148,12 @@ void field(int rank) {
             current_winner = i;
           }
         }
-        buffer[1] = current_winner;
+
+        if (current_winner == -1) {
+          buffer[1] = currentField;
+        } else {
+          buffer[1] = current_winner + 12;
+        }
       }
     }
     broadcast(buffer, currentField);
@@ -157,99 +162,40 @@ void field(int rank) {
       // We can print the round information
       for (i = 0; i < NUMPLAYERS; i++) {
         printf("%i %i %i %i %i %i %i %i\n",
-               i % 11,                       // Player
-                                             // number
-                                             // (within the
-                                             // team)
-               players[i].posY,              // starting
-                                             // position
+               i % 11,                         // Player
+                                               // number
+                                               // (within the
+                                               // team)
+               players[i].posY,                // starting
+                                               // position
                players[i].posX,
-               players[i].newY,              // ending
-                                             // position
+               players[i].newY,                // ending
+                                               // position
                players[i].newX,
-               (players[i].newX == ballX) && // reached
+               (players[i].newX == ballX) &&   // reached
                (players[i].newY == ballY),
-               (i == buffer[1]),             // kicked
-               players[i].challenge          // challenge
+               (players[i].rank == buffer[1]), // kicked
+               players[i].challenge            // challenge
                );
         players[i].posX = players[i].newX;
         players[i].posY = players[i].newY;
       }
     }
 
+    // if nobody won, the field sends out ROUND_OVER
+    if (buffer[1] == rank) {
+      buffer[0] = ROUND_OVER;
+      buffer[1] = ballX;
+      buffer[2] = ballY;
+      broadcast(buffer, rank);
+    } else {
+      broadcast(buffer, buffer[1]);
+    }
 
-    //   MPI_Bcast(buffer,
-    //             MSG_LENGTH,
-    //             MPI_INT,
-    //             0,
-    //             MPI_COMM_WORLD);
-
-    //   if ((ballX <= 31) && (ballY <= 31)) {
-    //     handle_challenges(buffer, );
-    //   }
-
-    //   for (i = 0; i < numplayers; i++) {
-    //     RecvPlayer(&players[i]);
-
-    //     if ((players[i].messageBuffer[1] == ballX) &&
-    //         (players[i].messageBuffer[2] == ballY)) {
-    //       numWithBall++;
-
-    //       // Simple one-pass random sample.
-    //       // THe first gets chosen with p = 1, the second replaces that with
-    // p
-    // =
-    //       // 1/2, and so on
-    //       if (rand() % numWithBall == 0) {
-    //         baller = i;
-    //       }
-    //     }
-    //   }
-
-    //   for (i = 0; i < numplayers; i++) {
-    //     printf("%i %i %i %i %i %i %i %i %i %i\n",
-    //            i,
-    //            players[i].posY,
-    //            players[i].posX,
-    //            players[i].messageBuffer[2],
-    //            players[i].messageBuffer[1],
-    //            (players[i].messageBuffer[1] == ballX) &&
-    //            (players[i].messageBuffer[2] == ballY),
-    //            (numWithBall != 0) && (i == baller),
-    //            players[i].messageBuffer[3],
-    //            players[i].messageBuffer[4],
-    //            players[i].messageBuffer[5]
-    //            );
-    //     players[i].posX = players[i].messageBuffer[1];
-    //     players[i].posY = players[i].messageBuffer[2];
-    //   }
-
-    //   // Skip the kick phase if noboody has the ball
-    //   if (numWithBall == 0) {
-    //     continue;
-    //   }
-
-    //   // If a player has the ball, enter the kick phase.
-    //   players[baller].messageBuffer[0] = KICK_PHASE;
-    //   IsendPlayer(&players[baller]);
-    //   RecvPlayer(&players[baller]);
-    //   ballX = players[baller].messageBuffer[1];
-    //   ballY = players[baller].messageBuffer[2];
-
-    //   // printf("Player %i kicked the ball to %i %i!\n",
-    //   //        players[baller].rank,
-    //   //        ballX,
-    //   //        ballY);
-    // }
-
-    // printf("Game Over, Man. Game Over.\n");
-
-    // Tell all players the game is up
-    // if (rank == 0) {
-    //   buffer[0] = GAME_OVER;
-    // }
-    // printf("Sending Game Over");
-    // rootBroadcast(buffer);
+    if (isRoot) {
+      ballX = buffer[1];
+      ballY = buffer[2];
+    }
   }
 }
 
@@ -343,31 +289,17 @@ void player(int rank) {
     // KICK_PHASE
     broadcast(buffer, currentField);
 
-    if (myIndex == buffer[1]) {
-      printf("I won I won!\n");
+    if (rank == buffer[1]) {
+      buffer[0] = ROUND_OVER;
+      buffer[1] = rand() % FIELD_WIDTH;
+      buffer[2] = rand() % FIELD_LENGTH;
+
+      // ROUND_END
+      broadcast(buffer, rank);
+    } else {
+      broadcast(buffer, buffer[1]);
     }
-
-    // buffer[3] = ran;
-    // buffer[4] = timesReached;
-    // buffer[5] = timesKicked;
-    // MPI_Send(buffer, MSG_LENGTH, MPI_INT, 0, DEFAULT_TAG, MPI_COMM_WORLD);
-
-    // buffer[1] = rand() % FIELD_WIDTH;
-    // buffer[2] = rand() % FIELD_LENGTH;
-    // MPI_Send(buffer, MSG_LENGTH, MPI_INT, 0, DEFAULT_TAG, MPI_COMM_WORLD);
-    // ballX = 0;
-    // ballY = 0;
   }
-  printf("Player %i Ending", rank);
-
-  // printf(
-  //   "Player %i Ending.. I ran %i metres, reached the ball %i times and
-  // kicked
-  // %i times.\n",
-  //   rank,
-  //   ran,
-  //   timesReached,
-  //   timesKicked);
 }
 
 int main(int argc, char *argv[])

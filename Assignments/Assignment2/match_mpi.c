@@ -62,7 +62,11 @@ void broadcast(int *buffer, int broadcaster) {
 }
 
 int rankFor(int posX, int posY) {
-  return 0;
+  int index = 0;
+
+  index += (posX / 32) * 4;
+  index += (posY / 32);
+  return index;
 }
 
 // Master and field program.
@@ -114,7 +118,8 @@ void field(int rank) {
         buffer[4] = goalX;
         buffer[5] = goalLeftY;
       }
-      printf("Sending out for %i\n", players[i].rank);
+
+      // printf("Sending out for %i\n", players[i].rank);
     }
 
     // Broadcast

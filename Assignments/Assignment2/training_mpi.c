@@ -170,6 +170,8 @@ int moveTowards(int *xPos, int *yPos, int ballX, int ballY) {
     } else if (ballY < y) {
       y--;
     } else {
+      *xPos = x;
+      *yPos = y;
       return i;
     }
   }

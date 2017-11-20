@@ -25,7 +25,7 @@
 #define MSG_LENGTH 6
 
 #define NUMPLAYERS 22
-#define NUMROUNDS 50
+#define NUMROUNDS 2700
 #define FIELD_WIDTH 64
 #define FIELD_LENGTH 128
 #define GOAL_TOP 43
@@ -249,7 +249,7 @@ void field(int rank) {
         // Check for out, goals, etc. and update score as necessary
         if (ballY >= goalRightY) {
           if ((ballX <= GOAL_BOTTOM) && (ballX >= GOAL_TOP)) {
-            printf("left %i\n", j);
+            // printf("left %i\n", j);
 
             // Left team scores!
             if (j == 0) { // A defends left and scores right
@@ -263,7 +263,7 @@ void field(int rank) {
         }
         else if (ballY <= goalLeftY) {
           if ((ballX <= GOAL_BOTTOM) && (ballX >= GOAL_TOP)) {
-            printf("right %i\n", j);
+            // printf("right %i\n", j);
 
             // Right team scores!
             if (j == 0) { // A defends right and scores right
@@ -382,8 +382,8 @@ void player(int rank) {
         goalY   = buffer[5];
         myIndex = i;
 
-        // printf("Player %i Reporting In! I'm at % i, % i \n", rank, posX,
-        // posY);
+        // printf("Player %i Reporting In! Aiming % i, % i \n", rank, goalX,
+        // goalY);
       }
     }
     rounds = 0;

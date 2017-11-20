@@ -28,6 +28,11 @@
 #define NUMROUNDS 10
 #define FIELD_WIDTH 64
 #define FIELD_LENGTH 128
+#define GOAL_TOP 43
+#define GOAL_BOTTOM 51
+
+#define MIN(X, Y) ((X) < (Y) ? : (X) : (Y))
+#define MAX(X, Y) ((X) > (Y) ? : (X) : (Y))
 
 struct playerInfo {
   int team;
@@ -69,11 +74,17 @@ void field(int rank) {
   int  rounds = 0;
   int *buffer = (int *)malloc((sizeof(int) * MSG_LENGTH));
   int  ballX, ballY, numWithBall, baller;
+  int  goalX, goalRightY, goalLeftY;
 
   // printf("Initiating Master Field Program..\n");
 
   struct playerInfo players[numplayers];
 
+  if (isRoot) {
+    goalX      = (GOAL_TOP + GOAL_BOTTOM) / 2;
+    goalRightY = FIELD_LENGTH;
+    goalLeftY  = -1;
+  }
 
   // Initialize every player, send them their info
   for (i = 0; i < numplayers; i++) {
@@ -87,6 +98,14 @@ void field(int rank) {
       buffer[1] = players[i].rank;
       buffer[2] = players[i].posX;
       buffer[3] = players[i].posY;
+
+      if (i < numplayers / 2) { // Team A
+        buffer[4] = goalX;
+        buffer[5] = goalRightY;
+      }  else {
+        buffer[4] = goalX;
+        buffer[5] = goalLeftY;
+      }
       printf("Sending out for %i\n", players[i].rank);
     }
 
@@ -95,8 +114,8 @@ void field(int rank) {
   }
 
   if (rank == 0) {
-    ballX = rand() % FIELD_WIDTH;
-    ballY = rand() % FIELD_LENGTH;
+    ballX = 48;
+    ballY = 64;
   }
 
 
@@ -195,6 +214,8 @@ void field(int rank) {
     if (isRoot) {
       ballX = buffer[1];
       ballY = buffer[2];
+
+      // Check for out, goals, etc. and update score as necessary
     }
   }
 }
@@ -232,15 +253,44 @@ int challenge(int dribble) {
   return r * dribble;
 }
 
+int min(int a, int b) {
+  if (a > b) return b;
+  else return a;
+}
+
+int max(int a, int b) {
+  if (a < b) return b;
+  else return a;
+}
+
+void randDistribution(int *a, int *b, int *c)  {
+  int i1 = rand() % 12;
+  int i2 = rand() % 12;
+  int s  = min(i1, i2);
+  int m  = max(i1, i2);
+
+  *a = 1 + s;
+  *b = m - s + 1;
+  *c = (12 - m) + 1;
+}
+
+int manhattan_distance(int x1, int y1, int x2, int y2) {
+  return abs(x1 - x2) + abs(y1 - y2);
+}
+
 // Player program. Always using blocking sends and receives
 void player(int rank) {
   printf("Player with rank %i started\n", rank);
-  int type, posX, posY, ballX, ballY, myIndex, currentField;
+  int type, posX, posY, goalX, goalY, ballX, ballY, myIndex, currentField;
 
-  int rounds    = 0;
-  int speed     = 14;
-  int dribbling = 1;
-  int kick      = 0;
+  int rounds = 0;
+
+  // Randomly determine stats
+  int speed, dribbling, kick;
+  randDistribution(&speed, &dribbling, &kick);
+
+  printf("%i %i %i  = %i\n", speed, dribbling, kick, speed + dribbling +
+         kick);
   MPI_Status stat;
 
   int *buffer = (int *)malloc((sizeof(int) * MSG_LENGTH));
@@ -252,6 +302,8 @@ void player(int rank) {
     if (rank == buffer[1]) {
       posX    = buffer[2];
       posY    = buffer[3];
+      goalX   = buffer[4];
+      goalY   = buffer[5];
       myIndex = i;
 
       // printf("Player %i Reporting In! I'm at % i, % i \n", rank, posX,
@@ -271,7 +323,7 @@ void player(int rank) {
     // move towards the ball or die trying
     moveTowards(&posX, &posY, ballX, ballY, speed);
 
-    printf("Player %i moved to % i, % i \n", rank, posX, posY);
+    // printf("Player %i moved to % i, % i \n", rank, posX, posY);
 
     for (int i = 0; i < NUMPLAYERS; i++) {
       if (i == myIndex) {
@@ -291,8 +343,12 @@ void player(int rank) {
 
     if (rank == buffer[1]) {
       buffer[0] = ROUND_OVER;
-      buffer[1] = rand() % FIELD_WIDTH;
-      buffer[2] = rand() % FIELD_LENGTH;
+      buffer[1] = posX;
+      buffer[2] = posY;
+      moveTowards(&buffer[1], &buffer[2], goalX, goalY, kick * 2);
+
+      printf("%i with kick power %i kicked the ball to %i,%i\n", rank, kick,
+             buffer[1], buffer[2]);
 
       // ROUND_END
       broadcast(buffer, rank);

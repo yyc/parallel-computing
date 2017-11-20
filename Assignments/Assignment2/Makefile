@@ -17,7 +17,8 @@ training: training_build
 		tail training.lab.o;
 
 match: match_build
-	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" mpirun -hostfile hostfile -np 34 bin/match > match.lab.o;
+	/usr/bin/time -f "Real Time %e\nCPU Time %U \nKernel Time %S\nContext Switches %w" mpirun -hostfile hostfile -np 34 bin/match > match.lab.o;\ 
+	tail match.lab.o;
 
 match_mac: match_build
 	time mpirun -hostfile hostfile -np 34 bin/match

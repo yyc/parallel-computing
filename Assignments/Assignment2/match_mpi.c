@@ -44,6 +44,9 @@ struct playerInfo {
   int newY;
   int challenge;
 };
+int aScore = 0;
+int bScore = 0;
+
 
 void rootBroadcast(int *buffer) {
   MPI_Bcast(buffer,
@@ -70,7 +73,7 @@ int rankFor(int posX, int posY) {
 }
 
 // Master and field program.
-void field(int rank, int *aScore, int *bScore) {
+void field(int rank) {
   int  i = 0;
   bool isRoot = rank == 0;
   int  currentField, highest_challenge, current_winner;
@@ -244,24 +247,24 @@ void field(int rank, int *aScore, int *bScore) {
 
         // Check for out, goals, etc. and update score as necessary
         if (ballY >= goalRightY) {
-          if ((ballX < GOAL_BOTTOM) && (ballX > GOAL_TOP)) {
+          if ((ballX <= GOAL_BOTTOM) && (ballX >= GOAL_TOP)) {
             // Left team scores!
             if (j == 0) { // A defends left and scores right
-              *aScore += 1;
+              aScore += 1;
             } else {
-              *bScore += 1;
+              bScore += 1;
             }
           } // if false, then it's out and we reset to center
           ballX = 48;
           ballY = 64;
         }
         else if (ballY <= goalLeftY) {
-          if ((ballX < GOAL_BOTTOM) && (ballX > GOAL_TOP)) {
+          if ((ballX <= GOAL_BOTTOM) && (ballX >= GOAL_TOP)) {
             // Right team scores!
             if (j == 0) { // A defends right and scores right
-              *bScore += 1;
+              bScore += 1;
             } else {
-              *aScore += 1;
+              aScore += 1;
             }
           } // if false, then it's out and we reset to center
           ballX = 48;
@@ -432,8 +435,6 @@ int main(int argc, char *argv[])
 {
   int  numtasks, rank;
   int *msg;
-  int  aScore = 0;
-  int  bScore = 0;
 
 
   MPI_Init(&argc, &argv);
@@ -445,7 +446,7 @@ int main(int argc, char *argv[])
 
   if (rank < 12)
   { // Process is a field
-    field(rank, &aScore, &bScore);
+    field(rank);
   }
   else
   { // Initialize player
@@ -456,6 +457,6 @@ int main(int argc, char *argv[])
   MPI_Finalize();
 
   if (rank == 0) {
-    printf("Final Score:\nA: %i\nB:%i", aScore, bScore);
+    printf("Final Score:\nA: %i\nB:%i\n", aScore, bScore);
   }
 }

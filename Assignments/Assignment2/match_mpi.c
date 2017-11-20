@@ -24,7 +24,7 @@
 
 #define MSG_LENGTH 5
 
-#define NUMPLAYERS 2
+#define NUMPLAYERS 22
 #define NUMROUNDS 10
 #define FIELD_WIDTH 64
 #define FIELD_LENGTH 128
@@ -85,6 +85,7 @@ void field(int rank) {
     goalRightY = FIELD_LENGTH;
     goalLeftY  = -1;
   }
+  MPI_Barrier(MPI_COMM_WORLD);
 
   // Initialize every player, send them their info
   for (i = 0; i < numplayers; i++) {
@@ -278,15 +279,24 @@ int manhattan_distance(int x1, int y1, int x2, int y2) {
   return abs(x1 - x2) + abs(y1 - y2);
 }
 
-// Player program. Always using blocking sends and receives
+// Player program.
 void player(int rank) {
-  printf("Player with rank %i started\n", rank);
+  // printf("Player with rank %i started\n", rank);
   int type, posX, posY, goalX, goalY, ballX, ballY, myIndex, currentField;
-
   int rounds = 0;
+
+  MPI_Comm teamComm;
+
+  MPI_Comm_split(MPI_COMM_WORLD, (rank - 12) / 11, (rank - 12) % 11, &teamComm);
+  int teamRank, teamSize;
+
+  MPI_Comm_size(teamComm, &teamSize);
+  MPI_Comm_rank(teamComm, &teamRank);
+  printf("Player %i has team index %i/%i\n", rank, teamRank, teamSize);
 
   // Randomly determine stats
   int speed, dribbling, kick;
+
   randDistribution(&speed, &dribbling, &kick);
 
   printf("%i %i %i  = %i\n", speed, dribbling, kick, speed + dribbling +
@@ -294,6 +304,8 @@ void player(int rank) {
   MPI_Status stat;
 
   int *buffer = (int *)malloc((sizeof(int) * MSG_LENGTH));
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   // Get all the stuff at the start of the game
   for (int i = 0; i < NUMPLAYERS; i++) {
